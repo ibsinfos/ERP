@@ -664,9 +664,23 @@ function convert(type) {
             var BillSupplierModel = MODEL('billSupplier').Schema;
             var DeliveryModel = MODEL('delivery').Schema;
             var ObjectId = MODULE('utils').ObjectId;
+            if (MODEL('userAbsence'))
+                var UserAbsenceModel = MODEL('userAbsence').Schema;
+            if (MODEL('europexpress_planning'))
+                var PlanningModel = MODEL('europexpress_planning').Schema;
 
             var Model = [SocieteModel, BillModel, OfferModel, OrderModel, DeliveryModel, OrderSupplierModel, BillSupplierModel];
             var Collections = ['Societe', 'Facture', 'Commande', 'Offer', 'OrderSupplier', 'BillSupplier', 'Delivery'];
+
+            if (MODEL('userAbsence')) {
+                Model.push(UserAbsenceModel);
+                Collections.push('Absence');
+            }
+
+            if (MODEL('europexpress_planning')) {
+                Model.push(PlanningModel);
+                Collections.push('europexpress_planning');
+            }
 
             Collections.forEach(function(model) {
                 mongoose.connection.db.collection(model, function(err, collection) {
@@ -688,7 +702,7 @@ function convert(type) {
                                   });*/
                             //console.log(doc.commercial_id.id.substr(0, 5));
                             if (doc.commercial_id.id.substr(0, 5) == 'user:') //Not an automatic code
-                                UserModel.findOne({ username: doc.commercial_id.id.substr(5) }, "_id lastname firstname", function(err, user) {
+                                UserModel.findOne({ username: doc.commercial_id.id.substr(5).toLowerCase() }, "_id lastname firstname", function(err, user) {
 
                                 //console.log(user);
                                 //return;
@@ -712,15 +726,14 @@ function convert(type) {
                             if (!doc.author.id)
                                 return;
 
-                            /*  if (doc.commercial_id.id.toString().length == 24)
-                                  return doc.update({ $set: { 'commercial_id.id': ObjectId(doc.commercial_id.id) } }, function(err, doc) {
-                                      console.log(doc);
-                                      if (err)
-                                          console.log(err);
-                                  });*/
-                            //console.log(doc.commercial_id.id.substr(0, 5));
+                            if (doc.author.id.toString().length == 24)
+                                return doc.update({ $set: { 'author.id': ObjectId(doc.author.id) } }, function(err, doc) {
+                                    //console.log(doc);
+                                    if (err)
+                                        console.log(err);
+                                });
                             if (doc.author.id.substr(0, 5) == 'user:') //Not an automatic code
-                                UserModel.findOne({ username: doc.author.id.substr(5) }, "_id lastname firstname", function(err, user) {
+                                UserModel.findOne({ username: doc.author.id.substr(5).toLowerCase() }, "_id lastname firstname", function(err, user) {
 
                                 //console.log(user);
                                 //return;
@@ -730,6 +743,183 @@ function convert(type) {
                                         console.log(err);
                                 });
                             });
+                        });
+                    });
+                });
+                mongoose.connection.db.collection(model, function(err, collection) {
+                    collection.find({ "user.id": { $type: 2 } }, function(err, docs) {
+                        if (err)
+                            return console.log(err);
+                        //console.log(docs);
+
+                        docs.forEach(function(doc) {
+                            //console.log(doc.commercial_id);
+                            if (!doc.user.id)
+                                return;
+
+                            /*  if (doc.commercial_id.id.toString().length == 24)
+                                  return doc.update({ $set: { 'commercial_id.id': ObjectId(doc.commercial_id.id) } }, function(err, doc) {
+                                      console.log(doc);
+                                      if (err)
+                                          console.log(err);
+                                  });*/
+                            //console.log(doc.commercial_id.id.substr(0, 5));
+                            if (doc.user.id.substr(0, 5) == 'user:') //Not an automatic code
+                                UserModel.findOne({ username: doc.user.id.substr(5).toLowerCase() }, "_id lastname firstname", function(err, user) {
+
+                                //console.log(user, doc.user);
+                                //return;
+
+                                collection.update({ _id: doc._id }, { $set: { 'user.id': user._id, 'user.name': user.fullname } }, function(err, doc) {
+                                    if (err)
+                                        console.log(err);
+                                });
+                            });
+                        });
+                    });
+                });
+                mongoose.connection.db.collection(model, function(err, collection) {
+                    collection.find({ "details.driver.id": { $type: 2 } }, function(err, docs) {
+                        if (err)
+                            return console.log(err);
+                        //console.log(docs);
+
+                        docs.forEach(function(doc) {
+                            for (let i = 1; i < doc.details.length; i++) {
+
+                                if (!doc.details[i] || !doc.details[i].driver || !doc.details[i].driver.id)
+                                    continue;
+
+                                if (doc.details[i].driver.id.toString().length == 24) {
+                                    let query = {};
+                                    query['details.' + i + '.driver.id'] = ObjectId(doc.details[i].driver.id);
+
+                                    return doc.update({ $set: query }, function(err, doc) {
+                                        if (err)
+                                            console.log(err);
+                                    });
+                                }
+                                //console.log(doc.commercial_id.id.substr(0, 5));
+                                if (doc.details[i].driver.id.substr(0, 5) == 'user:') //Not an automatic code
+                                    UserModel.findOne({ username: doc.details[i].driver.id.substr(5).toLowerCase() }, "_id lastname firstname", function(err, user) {
+
+                                    //console.log(user, doc.user);
+                                    //return;
+
+                                    let query = {};
+                                    query['details.' + i + '.driver.id'] = user._id;
+                                    query['details.' + i + '.driver.name'] = user.fullname;
+
+                                    collection.update({ _id: doc._id }, { $set: query }, function(err, doc) {
+                                        if (err)
+                                            console.log(err);
+                                    });
+                                });
+                            }
+                        });
+                    });
+                });
+                mongoose.connection.db.collection(model, function(err, collection) {
+                    collection.find({ "details.formation.id": { $type: 2 } }, function(err, docs) {
+                        if (err)
+                            return console.log(err);
+                        //console.log(docs);
+
+                        docs.forEach(function(doc) {
+                            for (let i = 1; i < doc.details.length; i++) {
+
+                                if (!doc.details[i] || !doc.details[i].formation || !doc.details[i].formation.id)
+                                    continue;
+
+                                if (doc.details[i].formation.id.toString().length == 24) {
+                                    let query = {};
+                                    query['details.' + i + '.formation.id'] = ObjectId(doc.details[i].formation.id);
+
+                                    return doc.update({ $set: query }, function(err, doc) {
+                                        if (err)
+                                            console.log(err);
+                                    });
+                                }
+                                //console.log(doc.commercial_id.id.substr(0, 5));
+                                if (doc.details[i].formation.id.substr(0, 5) == 'user:') //Not an automatic code
+                                    UserModel.findOne({ username: doc.details[i].formation.id.substr(5).toLowerCase() }, "_id lastname firstname", function(err, user) {
+
+                                    //console.log(user, doc.user);
+                                    //return;
+
+                                    let query = {};
+                                    query['details.' + i + '.formation.id'] = user._id;
+                                    query['details.' + i + '.formation.name'] = user.fullname;
+
+                                    collection.update({ _id: doc._id }, { $set: query }, function(err, doc) {
+                                        if (err)
+                                            console.log(err);
+                                    });
+                                });
+                            }
+                        });
+                    });
+                });
+                mongoose.connection.db.collection(model, function(err, collection) {
+                    collection.find({ "details.formation.id": { $type: 7 } }, function(err, docs) {
+                        if (err)
+                            return console.log(err);
+                        //console.log(docs);
+
+                        docs.forEach(function(doc) {
+                            for (let i = 1; i < doc.details.length; i++) {
+
+                                if (!doc.details[i] || !doc.details[i].formation || !doc.details[i].formation.id)
+                                    continue;
+
+                                //console.log(doc.commercial_id.id.substr(0, 5));
+                                if (doc.details[i].formation.id.toString().length == 24)
+                                    UserModel.findOne({ _id: doc.details[i].formation.id }, "_id lastname firstname", function(err, user) {
+
+                                        //console.log(user, doc.user);
+                                        //return;
+
+                                        let query = {};
+                                        //query['details.' + i + '.formation.id'] = user._id;
+                                        query['details.' + i + '.formation.name'] = user.lastname;
+
+                                        collection.update({ _id: doc._id }, { $set: query }, function(err, doc) {
+                                            if (err)
+                                                console.log(err);
+                                        });
+                                    });
+                            }
+                        });
+                    });
+                });
+                mongoose.connection.db.collection(model, function(err, collection) {
+                    collection.find({ "details.driver.id": { $type: 7 } }, function(err, docs) {
+                        if (err)
+                            return console.log(err);
+                        //console.log(docs);
+
+                        docs.forEach(function(doc) {
+                            for (let i = 1; i < doc.details.length; i++) {
+
+                                if (!doc.details[i] || !doc.details[i].driver || !doc.details[i].driver.id)
+                                    continue;
+
+                                //console.log(doc.commercial_id.id.substr(0, 5));
+                                if (doc.details[i].driver.id.toString().length == 24)
+                                    UserModel.findOne({ _id: doc.details[i].driver.id }, "_id lastname firstname", function(err, user) {
+
+                                        //console.log(user, doc.user);
+                                        //return;
+
+                                        let query = {};
+                                        query['details.' + i + '.driver.name'] = user.lastname;
+
+                                        collection.update({ _id: doc._id }, { $set: query }, function(err, doc) {
+                                            if (err)
+                                                console.log(err);
+                                        });
+                                    });
+                            }
                         });
                     });
                 });
