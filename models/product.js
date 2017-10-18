@@ -1,3 +1,26 @@
+/**
+Copyright 2017 ToManage
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+@author    ToManage SAS <contact@tomanage.fr>
+@copyright 2014-2017 ToManage SAS
+@license   http://www.apache.org/licenses/LICENSE-2.0 Apache License, Version 2.0
+International Registered Trademark & Property of ToManage SAS
+*/
+
+
+
 "use strict";
 
 /**
@@ -10,182 +33,602 @@ var mongoose = require('mongoose'),
     _ = require("lodash"),
     Q = require('q');
 
-var setTags = function(tags) {
-    var result = [];
-    for (var i = 0; i < tags.length; i++)
-        if (typeof tags[i] == "object" && tags[i].text)
-            result.push(tags[i].text.trim());
-        else
-            result.push(tags[i].trim());
-
-    result = _.uniq(result);
-
-    //console.log(result);
-    return result;
-};
-
-var setLink = function(link) {
-    if (!link)
-        return null;
-
-    link = link.replace(/ /g, "_");
-    link = link.replace(/\//g, "");
-
-    //console.log(result);
-    return link;
-};
-
-var setAccount = function(account) {
-    if (account) {
-        account = account.replace(/ /g, "");
-        account = account.substring(0, 10); //limit a 10 character
-    }
-
-    return account;
-};
-
 var Dict = INCLUDE('dict');
 /**
  * Product Schema
  */
 
+var setRound3 = MODULE('utils').setRound3;
+
 var supplierPriceSchema = new Schema({
+    _id: false,
     societe: {
-        id: { type: Schema.Types.ObjectId, ref: 'societe' },
-        name: String
+        type: Schema.Types.ObjectId,
+        ref: 'Customers'
     },
     ref: String,
-    tva_tx: Number,
+    taxes: [{
+        _id: false,
+        taxeId: {
+            type: Schema.Types.ObjectId,
+            ref: 'taxes'
+        },
+        value: {
+            type: Number
+        } //for ecotaxe
+    }],
     minQty: Number,
-    replenishmentTime: { type: Number, default: 0 }, // delai de reappro en jr
+    replenishmentTime: {
+        type: Number,
+        default: 0
+    }, // delai de reappro en jr
     prices: {
-        pu_ht: { type: Number, default: 0 }, // For base price
-        pricesQty: { type: Schema.Types.Mixed } // For quantity price reduction
+        currency: {
+            type: String,
+            ref: 'currency',
+            default: 'EUR'
+        },
+        pu_ht: {
+            type: Number,
+            default: 0
+        } // For base price
+        //pricesQty: { type: Schema.Types.Mixed } // For quantity price reduction
     },
     packing: Number //conditionement
 }, {
-    toObject: { virtuals: true },
-    toJSON: { virtuals: true }
+    toObject: {
+        virtuals: true
+    },
+    toJSON: {
+        virtuals: true
+    }
 });
 
 
-supplierPriceSchema.virtual('pricesDetails')
+/*supplierPriceSchema.virtual('pricesDetails')
     .get(function() {
         var Pricebreak = INCLUDE('pricebreak');
 
         Pricebreak.set(this.prices.pu_ht, this.prices.pricesQty);
 
         return Pricebreak.humanize(true, 3);
-    });
+    });*/
 
+
+var maxlength = [255, 'The value of path `{PATH}` (`{VALUE}`) exceeds the maximum allowed length ({MAXLENGTH}).'];
+
+var LangSchema = new Schema({
+    _id: false,
+    description: {
+        type: String,
+        default: ''
+    }, //Bill Offer Delivery Order
+    shortDescription: {
+        type: String,
+        default: ''
+    }, // Resume ecommerce
+    body: {
+        type: String,
+        default: ''
+    }, // HTML ecommerce
+    name: {
+        type: String,
+        default: ''
+    },
+    meta: {
+        title: {
+            type: String,
+            default: '',
+            trim: true
+        },
+        description: {
+            type: String,
+            default: '',
+            trim: true,
+            maxlength: maxlength
+        }
+    },
+    linker: {
+        type: String,
+        sparse: true,
+        set: MODULE('utils').setLink
+    }, // SEO URL
+    Tag: {
+        type: [],
+        set: MODULE('utils').setTags
+    }
+}, {
+    toObject: {
+        virtuals: true
+    },
+    toJSON: {
+        virtuals: true
+    }
+});
+
+LangSchema.pre('save', function(next) {
+    var self = this;
+
+    // remove old packif change
+    //if (!this.linker)
+    //    this.linker = this.name.replace(/ /g, "-").toLowerCase();
+
+    next();
+});
+
+var product = {
+    _id: false,
+    id: {
+        type: Schema.Types.ObjectId,
+        ref: 'product'
+    },
+    qty: {
+        type: Number,
+        default: 0
+    }
+};
 
 var productSchema = new Schema({
-    oldId: String, // Only for import migration
-    ref: { type: String, required: true, unique: true, uppercase: true },
-    name: String, //copy of ref
-    seq: { type: String, unique: true },
-    isremoved: { type: Boolean, default: false },
-    compta_buy: { type: String, set: setAccount, trim: true },
-    compta_buy_eu: { type: String, set: setAccount, trim: true },
-    compta_buy_exp: { type: String, set: setAccount, trim: true },
-    compta_sell: { type: String, set: setAccount, trim: true },
-    compta_sell_eu: { type: String, set: setAccount, trim: true },
-    compta_sell_exp: { type: String, set: setAccount, trim: true },
-    label: { type: String, default: "" },
-    description: { type: String, default: "" },
-    body: { type: String, default: "" }, // Description For SEO
-    notePrivate: { type: String },
-    type: { type: String, default: 'PRODUCT' },
-    Status: String,
-    enabled: { type: Boolean, default: true },
-    istop: { type: Boolean, default: false },
-    sale: { type: Boolean, default: false }, // soldes
-    ischat: { type: Boolean, default: false },
-    negociate: { type: Number, default: 0 }, // 0 is no negociate
-    country_id: String,
-    tva_tx: { type: Number, default: 20 },
-    units: { type: String, default: "unit" },
-    minPrice: { type: Number, default: 0 },
-    finished: String,
-    tms: Date, // Not used ??
-    datec: { type: Date, default: Date.now },
-    billingMode: { type: String, uppercase: true, default: "QTY" }, //MONTH, QTY, ...
-    Tag: { type: [], set: setTags },
-    entity: [String],
-    price: [{
-        _id: { type: Schema.Types.ObjectId, required: true },
-        price_level: String,
-        tms: Date,
-        pu_ht: Number,
-        qtyMin: { type: Number, default: 0 },
-        ref_customer_code: String,
-        user_mod: Schema.Types.Mixed,
-        tva_tx: Number,
-        dsf_coef: Number,
-        dsf_time: Number
-    }],
-    // new price model
-    prices: {
-        pu_ht: { type: Number, default: 0 }, // For base price
-        pricesQty: { type: Schema.Types.Mixed } // For quantity price reduction
+    isSell: {
+        type: Boolean,
+        default: true
     },
-    pu_ht: { type: Number, default: 0 }, // For base price OLD
-    user_mod: { id: String, name: String },
-    history: [{
-        tms: Date,
-        user_mod: Schema.Types.Mixed,
-        pu_ht: Number,
-        ref_customer_code: String
+    isBuy: {
+        type: Boolean,
+        default: false
+    },
+    isBundle: {
+        type: Boolean,
+        default: false
+    },
+    isPackaging: {
+        type: Boolean,
+        default: false
+    },
+    isVariant: {
+        type: Boolean,
+        default: false
+    },
+    isValidated: {
+        type: Boolean,
+        default: false
+    }, //Integration publication
+    groupId: {
+        type: String,
+        default: null
+    },
+    //  job: { type: Schema.Types.ObjectId, ref: 'jobs', default: null },
+    canBeSold: {
+        type: Boolean,
+        default: true
+    },
+    canBeExpensed: {
+        type: Boolean,
+        default: true
+    },
+    eventSubscription: {
+        type: Boolean,
+        default: true
+    },
+
+    onlyWeb: {
+        type: Boolean
+    },
+    istop: {
+        type: Boolean,
+        default: false
+    },
+    ischat: {
+        type: Boolean,
+        default: false
+    },
+    imageSrc: {
+        type: Schema.Types.ObjectId,
+        ref: 'Images'
+    },
+
+    entity: [String],
+
+    oldId: String, // Only for import migration
+
+    //ref: { type: String, required: true, unique: true, uppercase: true }, //TODO Remove
+    name: {
+        type: String,
+        default: ''
+    },
+    ID: {
+        type: Number,
+        unique: true
+    },
+    isremoved: {
+        type: Boolean,
+        default: false
+    },
+
+    info: {
+        productType: {
+            type: Schema.Types.ObjectId,
+            ref: 'productTypes',
+            default: null
+        },
+        isActive: {
+            type: Boolean,
+            default: true
+        },
+        autoBarCode: {
+            type: Boolean,
+            default: false
+        },
+        //barCode: { type: String, index: true, uppercase: true, sparse: true },
+        aclCode: {
+            type: String,
+            uppercase: true
+        },
+        SKU: {
+            type: String,
+            unique: true,
+            require: true
+        },
+        UPC: {
+            type: String,
+            default: null
+        },
+        ISBN: {
+            type: String,
+            default: null
+        },
+        EAN: {
+            type: String,
+            default: null,
+            index: true,
+            uppercase: true,
+            sparse: true
+        },
+
+        brand: {
+            type: Schema.Types.ObjectId,
+            ref: 'Brand',
+            default: null
+        },
+        categories: [{
+            type: Schema.Types.ObjectId,
+            ref: 'productCategory'
+        }],
+
+        notePrivate: {
+            type: String
+        },
+
+        /* PIM transaltion */
+        langs: [LangSchema]
+            /* need to Add  alt des images TODO */
+
+
+    },
+
+    compta_buy: {
+        type: String,
+        set: MODULE('utils').setAccount,
+        trim: true
+    },
+    compta_buy_eu: {
+        type: String,
+        set: MODULE('utils').setAccount,
+        trim: true
+    },
+    compta_buy_exp: {
+        type: String,
+        set: MODULE('utils').setAccount,
+        trim: true
+    },
+    compta_sell: {
+        type: String,
+        set: MODULE('utils').setAccount,
+        trim: true
+    },
+    compta_sell_eu: {
+        type: String,
+        set: MODULE('utils').setAccount,
+        trim: true
+    },
+    compta_sell_exp: {
+        type: String,
+        set: MODULE('utils').setAccount,
+        trim: true
+    },
+
+    inventory: {
+        langs: [{
+            _id: false,
+            availableLater: {
+                type: String,
+                default: ''
+            }
+        }],
+        minStockLevel: {
+            type: Number,
+            default: 0
+        },
+        maxStockLevel: {
+            type: Number
+        },
+        stockTimeLimit: {
+            type: Number,
+            default: 360
+        }
+    },
+    packing: {
+        type: Number,
+        default: 1
+    }, //conditonnement
+
+    variants: [{
+        type: Schema.Types.ObjectId,
+        ref: 'productAttibutesValues'
     }],
-    template: { type: String },
+    attributes: [{
+        _id: false,
+        attribute: {
+            type: Schema.Types.ObjectId,
+            ref: 'productAttributes'
+        },
+        value: {
+            type: Schema.Types.Mixed
+        }, // Not for select
+        options: [{
+            type: Schema.Types.ObjectId,
+            ref: 'productAttibutesValues'
+        }],
+
+        //product_feacture_value if value != null
+        channels: [{
+            _id: false,
+            channel: {
+                type: Schema.Types.ObjectId,
+                ref: 'integrations'
+            },
+            integrationId: String
+        }]
+    }],
+
+    pack: [product], // conditionned pack from MP + production form supplier -> be in stock need prepare
+    bundles: [product], // bundles or promotion pack of sell products -> Not prepare before order
+
+    search: [String],
+
+    workflow: {
+        type: Schema.Types.ObjectId,
+        ref: 'workflows',
+        default: null
+    },
+    whoCanRW: {
+        type: String,
+        enum: ['owner', 'group', 'everyOne'],
+        default: 'everyOne'
+    },
+
+    groups: {
+        owner: {
+            type: Schema.Types.ObjectId,
+            ref: 'Users',
+            default: null
+        },
+        users: [{
+            type: Schema.Types.ObjectId,
+            ref: 'Users',
+            default: null
+        }],
+        group: [{
+            type: Schema.Types.ObjectId,
+            ref: 'Department',
+            default: null
+        }]
+    },
+
+    createdBy: {
+        type: Schema.Types.ObjectId,
+        ref: 'Users'
+    },
+    editedBy: {
+        type: Schema.Types.ObjectId,
+        ref: 'Users'
+    },
+
+
+    externalId: {
+        type: String,
+        default: ''
+    },
+
+    files: {
+        type: Array,
+        default: []
+    },
+    attachments: {
+        type: Array,
+        default: []
+    },
+
+    //label: { type: String, default: "" },
+    //description: { type: String, default: "" },
+    //body: { type: String, default: "" }, // Description For SEO
+
+    //type: { type: String, default: 'PRODUCT' },
+    Status: {
+        type: String,
+        default: 'DISABLED'
+    },
+    //enabled: { type: Boolean, default: true },
+    //ischat: { type: Boolean, default: false },
+    //negociate: { type: Number, default: 0 }, // 0 is no negociate
+    taxes: [{
+        _id: false,
+        taxeId: {
+            type: Schema.Types.ObjectId,
+            ref: 'taxes'
+        },
+        value: {
+            type: Number
+        } // sample ecotax
+    }],
+    //tva_tx: { type: Number, default: 20 },
+    //datec: { type: Date, default: Date.now },
+    //billingMode: { type: String, uppercase: true, default: "QTY" }, //MONTH, QTY, ...
+
+
+    // price model just for list product
+    prices: {
+        pu_ht: {
+            type: Number,
+            default: 0
+        }, // For base price
+        //pricesQty: { type: Schema.Types.Mixed } // For quantity price reduction
+    },
+
+    template: {
+        type: String
+    },
     dynForm: String,
-    caFamily: { type: String, uppercase: true },
-    subFamily: { type: String, uppercase: true },
-    costCenter: { type: String, uppercase: true },
-    subCostCenter: { type: String, uppercase: true },
-    category: String,
-    linker_category: String,
-    weight: { type: Number, default: 0 }, // Poids en kg
-    minQty: Number,
-    stock: {
+
+    sellFamily: {
+        type: Schema.Types.ObjectId,
+        ref: 'productFamily',
+        require: true
+    },
+    costFamily: {
+        type: Schema.Types.ObjectId,
+        ref: 'productFamily',
+        default: '59b791bdf8604049aefea737'
+    },
+
+    units: {
+        type: String,
+        default: "unit"
+    },
+
+    /*size: {
+        length: { type: Number, default: 0 },
+        width: { type: Number, default: 0 },
+        height: { type: Number, default: 0 },
+        dimension: { type: String, default: 'cm' },
+        
+    },MOVE TO ATTRIBUTES */
+    weight: {
+        type: Number,
+        default: 0
+    }, // Poids en kg
+
+    // TODO Remove old model stock
+    /*stock: {
         zone: String,
         driveway: String, //allee
         rack: Number, // column
         floor: Number // etage
-    },
-    autoBarCode: { type: Boolean, default: true },
-    barCode: { type: String, index: true, uppercase: true, sparse: true },
-    aclCode: { type: String, uppercase: true },
+    },*/
+
     suppliers: [supplierPriceSchema],
+
     /******** VAD Method **************/
-    directCost: { type: Number, default: 0 }, //Total MP
-    indirectCost: { type: Number, default: 0 }, //Total Effort
-    totalCost: { type: Number, default: 0 }, //Total MP + Effort
+    directCost: {
+        type: Number,
+        default: 0
+    }, //Total MP
+    indirectCost: {
+        type: Number,
+        default: 0
+    }, //Total Effort
     /**********************************/
 
-    optional: Schema.Types.Mixed,
-    linker: { type: String, unique: true, set: setLink }, // SEO URL
-    attributes: [{
-        key: { type: String },
-        value: { type: String },
-        css: { type: String }
-    }],
-    pack: [{
-        id: { type: Schema.Types.ObjectId, ref: 'product' },
-        qty: { type: Number, default: 0 }
-    }],
-    search: [String]
+    optional: Schema.Types.Mixed, // TODO Remove ?
+
+    // For color and % good quality of information
+    rating: {
+        marketing: {
+            type: Number,
+            default: 0,
+            set: setRound3
+        },
+        attributes: {
+            type: Number,
+            default: 0,
+            set: setRound3
+        },
+        ecommerce: {
+            type: Number,
+            default: 0,
+            set: setRound3
+        },
+        images: {
+            type: Number,
+            default: 0,
+            set: setRound3
+        },
+        categories: {
+            type: Number,
+            default: 0,
+            set: setRound3
+        },
+        total: {
+            type: Number,
+            default: 0,
+            set: setRound3
+        }
+    }
+
 }, {
-    toObject: { virtuals: true },
-    toJSON: { virtuals: true }
+    toObject: {
+        virtuals: true
+    },
+    toJSON: {
+        virtuals: true
+    }
 });
 
 productSchema.plugin(timestamps);
 
 if (CONFIG('storing-files')) {
-    var gridfs = INCLUDE('_' + CONFIG('storing-files'));
-    productSchema.plugin(gridfs.pluginGridFs, { root: "Product" });
+    var gridfs = INCLUDE(CONFIG('storing-files'));
+    productSchema.plugin(gridfs.pluginGridFs, {
+        root: "Product"
+    });
 }
+
+productSchema.statics.next = function(options, callback) {
+    var self = this;
+
+    this.find({
+            _id: {
+                $gt: options._id,
+                isremove: {
+                    $ne: true
+                }
+            }
+        })
+        .sort({
+            'info.SKU': 1
+        })
+        .limit(1)
+        .exec(callback);
+};
+
+productSchema.statics.previous = function(options, callback) {
+    var self = this;
+
+    this.find({
+            _id: {
+                $gt: options._id,
+                isremove: {
+                    $ne: true
+                }
+            }
+        })
+        .sort({
+            'info.SKU': -1
+        })
+        .limit(1)
+        .exec(callback);
+};
+
 
 // Gets listing
 productSchema.statics.query = function(options, callback) {
@@ -208,8 +651,12 @@ productSchema.statics.query = function(options, callback) {
 
     var query = {
         enabled: true,
-        Status: { $in: ['SELL', 'SELLBUY'] },
-        'prices.pu_ht': { $gt: 0 }
+        Status: {
+            $in: ['SELL', 'SELLBUY']
+        },
+        'prices.pu_ht': {
+            $gt: 0
+        }
     };
 
     if (options.category)
@@ -220,7 +667,9 @@ productSchema.statics.query = function(options, callback) {
     //    builder.in('search', options.search.keywords(true, true));
     if (options.id) {
         if (typeof options.id === 'object')
-            options.id = { '$in': options.id };
+            options.id = {
+                '$in': options.id
+            };
         query._id = options.id;
     }
     if (options.skip)
@@ -329,57 +778,7 @@ productSchema.statics.query = function(options, callback) {
     });
 };
 
-productSchema.statics.findPrice = function(options, fields, callback) {
-    var self = this;
-
-    var Pricebreak = INCLUDE('pricebreak');
-    var query = {};
-
-    if (options._id)
-        query._id = options._id;
-
-    if (options.ref)
-        query.ref = options.ref;
-
-    if (typeof fields === 'function') {
-        callback = fields;
-        fields = "prices discount";
-    }
-
-    this.findOne(query, fields, function(err, doc) {
-        if (err)
-            return callback("err : model product/price");
-
-        if (!doc)
-            return callback(null, {});
-
-        if (options.price_level && options.price_level !== 'BASE') {
-            var modelClass = MODEL('pricelevel').Schema;
-            return modelClass.findOne({ "product": doc._id, price_level: options.price_level }, function(err, res) {
-                if (err)
-                    return console.log(err);
-
-                //console.log(res, self._id, price_level);
-                if (!res) { // No specific price using BASE Prices
-                    Pricebreak.set(doc.prices.pu_ht, doc.prices.pricesQty);
-                    return callback(null, { pu_ht: Pricebreak.price(options.qty).price, discount: doc.discount || 0 });
-                }
-
-                Pricebreak.set(res.prices.pu_ht, res.prices.pricesQty);
-
-                callback(null, { pu_ht: Pricebreak.price(options.qty).price, discount: res.discount || 0 });
-            });
-        }
-
-        Pricebreak.set(doc.prices.pu_ht, doc.prices.pricesQty);
-
-        //console.log(doc);
-        callback(null, { pu_ht: Pricebreak.price(options.qty).price, discount: doc.discount || 0 });
-    });
-};
-
-
-productSchema.methods.getPrice = function(qty, price_level) {
+/*productSchema.methods.getPrice = function(qty, price_level) {
     var Pricebreak = INCLUDE('pricebreak');
     var self = this;
     var d = Q.defer();
@@ -415,95 +814,222 @@ productSchema.methods.getPrice = function(qty, price_level) {
 
     d.resolve(Pricebreak.price(qty).price);
     return d.promise;
-};
+};*/
+
+productSchema.methods.updateRating = function() {
+    /* RATING UPDATE */
+    // attributes
+    if (this.attributes && this.attributes.length) {
+        let cpt = 0;
+        _.each(this.attributes, function(elem) {
+            if (elem.value || elem.options.length)
+                cpt++
+        });
+        this.rating.attributes = cpt * 1 / this.attributes.length;
+    }
+
+    //ecommerce
+    let ecommerce = 0;
+    if (this.info.langs[0].meta.title)
+        ecommerce++;
+    if (this.info.langs[0].meta.description)
+        ecommerce++;
+    if (this.info.langs[0].linker)
+        ecommerce++;
+    if (this.info.langs[0].shortDescription)
+        ecommerce++;
+    if (this.info.langs[0].body)
+        ecommerce++;
+    this.rating.ecommerce = ecommerce / 5;
+
+    //images
+    this.rating.images = 0;
+    if (this.imageSrc)
+        this.rating.images = 1;
+
+    //categories
+    this.rating.categories = 0;
+    if (this.info.categories.length)
+        this.rating.categories = 1;
+    //marketing
+
+
+    let marketing = 0;
+    if (this.info.langs[0].description)
+        marketing++;
+    if (this.info.langs[0].Tag.length)
+        marketing++;
+    if (this.weight !== null)
+        marketing++;
+
+    this.rating.marketing = marketing / 3;
+
+    this.rating.total = (this.rating.attributes + this.rating.ecommerce + this.rating.images + this.rating.marketing) / 4;
+}
 
 productSchema.pre('save', function(next) {
     var SeqModel = MODEL('Sequence').Schema;
     var self = this;
+    var round = MODULE('utils').round;
 
-    self.name = self.ref;
+    if (this.info && this.info.langs && this.info.langs.length)
+        this.name = this.info.langs[0].name;
 
-    if (this.isNew)
-        this.history = [];
+    if (this.info.productType && this.info.productType._id) {
+        if (this.info.productType.isBundle) {
+            this.isBundle = true;
+            this.isBuy = false;
+        } else {
+            this.isBundle = false
+            this.bundles = [];
+        }
 
-    if (this.type !== 'DYNAMIC')
-        this.dynForm = null;
-
-    // remove old packif change
-    if (this.type !== 'PACK')
-        this.pack = [];
-
-    if (!this.linker)
-        this.linker = this.ref.replace(/ /g, "-").toLowerCase();
-    else
-        this.linker = this.linker.replace(/ /g, "-");
-
-    if (this.category) {
-        var category = prepare_subcategories(this.category);
-        this.category = category.name;
-        this.linker_category = category.linker;
+        if (this.info.productType.isPackaging) {
+            this.isPackaging = true;
+            this.isBuy = false;
+        } else {
+            this.isPackaging = false
+            this.pack = [];
+        }
     }
 
-    if (this.autoBarCode == true && this.seq) {
-        this.barCode = "";
-
-        if (this.caFamily)
-            this.barCode += this.caFamily.substr(0, 2);
-
-        this.barCode += this.seq;
+    if (this.info.isActive == false) {
+        this.isValidated = false;
+        this.Status = 'DISABLED'
+    } else {
+        if (this.isValidated == true)
+            this.Status = 'VALIDATED';
+        else
+            this.Status = 'PREPARED';
     }
 
-    var search = (this.name + ' ' + this.category);
-    this.attributes.forEach(function(elem) {
-        search += ' ' + elem.value;
-    });
+    this.updateRating();
 
-    this.search = search.keywords(true, true);
+    /* if (this.category) {
+         var category = prepare_subcategories(this.category);
+         this.category = category.name;
+         this.linker_category = category.linker;
+     }*/
 
-    if (this.isModified('suppliers')) { // a buy price changed
-        if (this.suppliers.length)
-            this.directCost = this.suppliers[0].prices.pu_ht;
+    if (this.info && this.info.autoBarCode == true && this.seq) {
+        this.info.EAN = "";
 
-        this.totalCost = this.directCost + this.indirectCost;
+        //if (this.caFamily)
+        //    this.info.barCode += this.caFamily.substr(0, 2);
+
+        this.info.EAN += this.seq;
     }
 
-    if (this.type == 'PACK') {
-        this.directCost = 0;
-        for (var i = 0; i < this.pack.length; i++)
-            if (this.pack[i].id && this.pack[i].id.totalCost)
-                this.directCost += this.pack[i].id.totalCost * this.pack[i].qty;
-
-        this.totalCost = this.directCost + this.indirectCost;
+    if (this.info && this.info.langs && this.info.langs.length) {
+        var search = (this.info.langs[0].name + ' ' + this.info.langs[0].decription);
+        /*this.attributes.forEach(function(elem) {
+            search += ' ' + elem.value;
+        });*/
+        this.search = search.keywords(true, true);
     }
 
-    if (!this.isNew && this.isModified('totalCost')) // Emit to all that a product change totalCost
-        F.functions.EE.emit('product', { type: 'updateCost', data: { _id: this._id } });
+    if (this.isBundle) {
+        let directCost = 0;
+        if (this.taxes[1] && this.taxes[1].value) // reset ecotaxe
+            this.taxes[1].value = 0;
 
+        //this.weight = 0; //reset weight
 
-    if (this.isNew || !this.seq) {
-        if (!this.body)
-            this.body = this.description;
-
-        SeqModel.incNumber("P", 7, function(seq) {
-            self.seq = seq;
-
-            if (self.autoBarCode == true) {
-                self.barCode = "";
-
-                if (self.caFamily)
-                    self.barCode += self.caFamily.substr(0, 2);
-
-                self.barCode += seq;
+        for (var i = 0; i < this.bundles.length; i++)
+            if (this.bundles[i].id && this.bundles[i].id.directCost) {
+                directCost += this.bundles[i].id.directCost * this.bundles[i].qty;
+                //this.weight += this.bundles[i].id.weight * this.bundles[i].qty;
+                if (this.bundles[i].id.taxes[1] && this.bundles[i].id.taxes[1].value) // Add ecotaxe
+                    if (this.taxes[1] && this.taxes[1].value >= 0)
+                        this.taxes[1].value += this.bundles[i].id.taxes[1].value * this.bundles[i].qty;
+                    else
+                        this.taxes.push({
+                            taxeId: this.bundles[i].id.taxes[1].taxeId,
+                            value: this.bundles[i].id.taxes[1].value * this.bundles[i].qty
+                        });
             }
 
-            next();
+            //console.log(this);
+
+        if (this.directCost != directCost)
+            this.directCost = directCost;
+    }
+
+    if (this.isPackaging) {
+        let directCost = 0;
+        if (this.taxes[1] && this.taxes[1].value) // reset ecotaxe
+            this.taxes[1].value = 0;
+
+        //this.weight = 0; //reset weight
+
+        for (var i = 0; i < this.pack.length; i++)
+            if (this.pack[i].id && this.pack[i].id.directCost) {
+                directCost += this.pack[i].id.directCost * this.pack[i].qty;
+                //this.weight += this.pack[i].id.weight * this.pack[i].qty;
+                if (this.pack[i].id.taxes[1] && this.pack[i].id.taxes[1].value) // Add ecotaxe
+                    if (this.taxes[1] && this.taxes[1].value >= 0)
+                        this.taxes[1].value += this.pack[i].id.taxes[1].value * this.pack[i].qty;
+                    else
+                        this.taxes.push({
+                            taxeId: this.pack[i].id.taxes[1].taxeId,
+                            value: this.pack[i].id.taxes[1].value * this.pack[i].qty
+                        });
+            }
+
+        if (this.directCost != directCost)
+            this.directCost = directCost;
+    }
+
+    if (this.sellFamily && this.sellFamily._id) {
+        if (this.sellFamily.indirectCostRate)
+            this.indirectCost = round(this.directCost * this.sellFamily.indirectCostRate / 100, 3);
+    }
+
+    if (!this.isNew && (this.isModified('directCost') || this.isModified('indirectCost') || this.isModified('sellFamily'))) // Emit to all that a product change totalCost
+        setTimeout2('product:updateDirectCost_' + this._id.toString(), function() {
+        F.emit('product:updateDirectCost', {
+            userId: self.editedBy.toString(),
+            product: {
+                _id: self._id.toString()
+            }
+        });
+    }, 500);
+
+    //Emit product update
+    setTimeout2('product:' + this._id.toString(), function() {
+        F.emit('product:update', {
+            userId: self.editedBy.toString(),
+            product: {
+                _id: self._id.toString()
+            }
+        });
+    }, 1000);
+
+
+    if (this.isNew || this.ID === null) {
+        //if (!this.body)
+        //    this.body = this.description;
+
+        return SeqModel.incNumber("P", 7, function(seq, number) {
+            self.ID = number;
+
+            if (self.info.autoBarCode == true) {
+                self.info.EAN = "";
+
+                self.info.EAN += seq;
+            }
+
+            return next();
         });
     } else
         next();
 });
 
 var dict = {};
-Dict.dict({ dictName: ['fk_product_status', 'fk_units'], object: true }, function(err, doc) {
+Dict.dict({
+    dictName: ['fk_product_status', 'fk_units'],
+    object: true
+}, function(err, doc) {
     if (err) {
         console.log(err);
         return;
@@ -511,37 +1037,21 @@ Dict.dict({ dictName: ['fk_product_status', 'fk_units'], object: true }, functio
     dict = doc;
 });
 
-productSchema.virtual('zone')
+productSchema.virtual('ecotax')
     .get(function() {
-        var zone = "";
+        if (!this.taxes || !this.taxes.length)
+            return 0;
 
-        if (this.type !== 'PRODUCT')
-            return null;
+        for (var i = 0; i < this.taxes.length; i++)
+            if (this.taxes[i].value)
+                return this.taxes[i].value
 
-        if (!this.stock)
-            return "Inconnu";
+        return 0;
+    });
 
-        if (!this.stock.zone)
-            return "Inconnu";
-
-        zone += this.stock.zone;
-
-        if (!this.stock.driveway)
-            return "Inconnu";
-
-        zone += this.stock.driveway;
-
-        if (!this.stock.rack)
-            return "Inconnu";
-
-        zone += "-" + MODULE('utils').numberFormat(this.stock.rack, 3);
-
-        if (!this.stock.floor)
-            return "Inconnu";
-
-        zone += "/" + this.stock.floor;
-
-        return zone;
+productSchema.virtual('totalCost')
+    .get(function() {
+        return this.directCost + this.indirectCost;
     });
 
 productSchema.virtual('eshopIsNew')
@@ -559,13 +1069,14 @@ productSchema.virtual('total_pack') // Set Total price for a pack
             return 0;
 
         for (var i = 0, len = this.pack.length; i < len; i++) {
-            total += this.pack[i].qty * this.pack[i].id.totalCost;
+            if (this.pack[i].id)
+                total += this.pack[i].qty * this.pack[i].id.totalCost;
         }
 
         return total;
     });
 
-productSchema.virtual('color') // Get default color in attributs
+/*productSchema.virtual('color') // Get default color in attributs
     .get(function() {
         var color = {};
 
@@ -580,7 +1091,7 @@ productSchema.virtual('color') // Get default color in attributs
         }
 
         return color;
-    });
+    });*/
 
 /*productSchema.method('linker_category', function (cb) {
  var self = this;
@@ -593,35 +1104,14 @@ productSchema.virtual('color') // Get default color in attributs
  });*/
 
 
-productSchema.virtual('pricesDetails')
+/*productSchema.virtual('pricesDetails')
     .get(function() {
         var Pricebreak = INCLUDE('pricebreak');
 
         Pricebreak.set(this.prices.pu_ht, this.prices.pricesQty);
 
         return Pricebreak.humanize(true, 3);
-    });
-
-productSchema.virtual('status')
-    .get(function() {
-        var res_status = {};
-
-        var status = this.Status;
-
-        if (status && dict.fk_product_status.values[status].label) {
-            //console.log(this);
-            res_status.id = status;
-            res_status.name = i18n.t("products:" + dict.fk_product_status.values[status].label);
-            //res_status.name = statusList.values[status].label;
-            res_status.css = dict.fk_product_status.values[status].cssClass;
-        } else { // By default
-            res_status.id = status;
-            res_status.name = status;
-            res_status.css = "";
-        }
-        return res_status;
-
-    });
+    });*/
 
 productSchema.virtual('_units')
     .get(function() {
@@ -640,6 +1130,68 @@ productSchema.virtual('_units')
         return res;
 
     });
+
+exports.Status = {
+    "_id": "fk_product_status",
+    "lang": "products",
+    "values": {
+        "ACTIVE": {
+            "enable": true,
+            "label": "Enabled",
+            "cssClass": "ribbon-color-success label-success",
+            "system": true
+        },
+        "DISABLED": {
+            "enable": true,
+            "label": "Disabled",
+            "cssClass": "ribbon-color-default label-default",
+            "system": true
+        },
+        "PUBLISHED": {
+            "enable": true,
+            "label": "Published",
+            "cssClass": "ribbon-color-success label-success",
+            "system": true
+        },
+        "VALIDATED": {
+            "enable": true,
+            "label": "Validated",
+            "cssClass": "ribbon-color-warning label-warning",
+            "system": true
+        },
+        "PREPARED": {
+            "enable": true,
+            "label": "Prepared",
+            "cssClass": "ribbon-color-danger label-danger",
+            "system": true
+        }
+    }
+};
+
+/**
+ * Methods
+ */
+productSchema.virtual('_status')
+    .get(function() {
+        var res_status = {};
+
+        var status = this.Status;
+        var statusList = exports.Status;
+
+        if (status && statusList.values[status] && statusList.values[status].label) {
+            res_status.id = status;
+            res_status.name = i18n.t(statusList.lang + ":" + statusList.values[status].label);
+            //this.status.name = statusList.values[status].label;
+            res_status.css = statusList.values[status].cssClass;
+        } else { // By default
+            res_status.id = status;
+            res_status.name = status;
+            res_status.css = "";
+        }
+
+        return res_status;
+    });
+
 
 exports.Schema = mongoose.model('product', productSchema, 'Product');
 exports.name = 'product';
@@ -663,28 +1215,81 @@ function prepare_subcategories(name) {
 
 
 F.on('load', function() {
-    // On refresh emit product
-
-    F.functions.EE.on('product', function(data) {
+    // Refresh pack prices from directCost
+    return;
+    /*F.functions.PubSub.on('product:updateDirectCost', function(channel, data) {
         //console.log(data);
-        console.log("Update emit product");
+        console.log("Update emit product", data.product);
 
-        switch (data.type) {
-            case 'updateCost':
-                if (data.data._id)
-                    exports.Schema.find({ 'pack.id': data.data._id })
-                    .populate("pack.id", "ref name label totalCost")
-                    .exec(function(err, products) {
-                        products.forEach(function(product) {
-                            product.save(function(err, doc) {
-                                if (err)
-                                    return console.log(err);
+        switch (channel) {
+            case 'product:updateDirectCost':
+                if (data.product._id) {
+                    exports.Schema.find({ 'bundles.id': data.product._id })
+                        //.populate({ path: 'product', select: 'sellFamily', populate: { path: "sellFamily" } })
+                        //.populate("priceLists")
+                        .populate("pack.id", "info directCost indirectCost")
+                        .populate("bundles.id", "info directCost indirectCost")
+                        .populate({
+                            path: 'info.productType'
+                                //    populate: { path: "options" }
+                        })
+                        .populate({
+                            path: 'sellFamily',
+                            populate: { path: "options", populate: { path: "group" } }
+                        })
+                        .exec(function(err, products) {
+                            products.forEach(function(product) {
+                                if (!product.isBundle)
+                                    return;
+
+                                product.save(function(err, doc) {
+                                    if (err)
+                                        return console.log(err);
+
+                                    //F.functions.PubSub.emit('product:updateDirectCost', {
+                                    //    data: doc
+                                    //});
+                                });
                             });
                         });
-                    });
+
+                    exports.Schema.find({ 'pack.id': data.product._id })
+                        //.populate({ path: 'product', select: 'sellFamily', populate: { path: "sellFamily" } })
+                        //.populate("priceLists")
+                        .populate("pack.id", "info directCost indirectCost")
+                        .populate("bundles.id", "info directCost indirectCost")
+                        .populate({
+                            path: 'info.productType'
+                                //    populate: { path: "options" }
+                        })
+                        .populate({
+                            path: 'sellFamily',
+                            populate: { path: "options", populate: { path: "group" } }
+                        })
+                        .exec(function(err, products) {
+
+                            products.forEach(function(product) {
+                                if (!product.isPackaging)
+                                    return;
+
+                                //console.log("PRODUCTS", product);
+                                product.save(function(err, doc) {
+                                    if (err)
+                                        return console.log(err);
+
+
+
+                                    // Emit to all that a productPrice in product list by coef was changed
+                                    //setTimeout2('productPrices:updatePrice_' + this._id.toString(), function() {
+                                    //F.functions.PubSub.emit('product:updateDirectCost', {
+                                    //    data: doc
+                                    //});
+                                    //}, 5000);
+                                });
+                            });
+                        });
+                }
                 break;
         }
-
-
-    });
+    });*/
 });

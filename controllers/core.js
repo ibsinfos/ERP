@@ -1,3 +1,26 @@
+/**
+Copyright 2017 ToManage
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+@author    ToManage SAS <contact@tomanage.fr>
+@copyright 2014-2017 ToManage SAS
+@license   http://www.apache.org/licenses/LICENSE-2.0 Apache License, Version 2.0
+International Registered Trademark & Property of ToManage SAS
+*/
+
+
+
 "use strict";
 
 var _ = require('lodash'),
@@ -9,6 +32,94 @@ var Dict = INCLUDE('dict');
 
 exports.install = function() {
     F.route('/erp/api/dict', load_dict, ['authorize']);
+    /**
+     *@api {get} /employees/nationality/ Request Employees nationality
+     *
+     * @apiVersion 0.0.1
+     * @apiName getEmployeesNationality
+     * @apiGroup Employee
+     *
+     * @apiSuccess {Object} EmployeesNationality
+     * @apiSuccessExample Success-Response:
+     HTTP/1.1 304 Not Modified
+     {
+       "data": [
+         {
+           "_id": "British",
+           "__v": 0
+         },
+         {
+           "_id": "Canadian",
+           "__v": 0
+         },
+         {
+           "_id": "Czech",
+           "__v": 0
+         },
+         {
+           "_id": "Danish",
+           "__v": 0
+         },
+         {
+           "_id": "English",
+           "__v": 0
+         },
+         {
+           "_id": "Finnish",
+           "__v": 0
+         },
+         {
+           "_id": "Georgian",
+           "__v": 0
+         },
+         {
+           "_id": "German",
+           "__v": 0
+         },
+         {
+           "_id": "Romanian",
+           "__v": 0
+         },
+         {
+           "_id": "Serbian",
+           "__v": 0
+         },
+         {
+           "_id": "Turkish",
+           "__v": 0
+         },
+         {
+           "_id": "Ukrainian",
+           "__v": 0
+         }
+       ]
+     }
+     */
+    F.route('/erp/api/nationality', getNationality, ['authorize']);
+    /**
+     *@api {get} /languages/ Request Employees languages
+     *
+     * @apiVersion 0.0.1
+     * @apiName getEmployeesLanguages
+     * @apiGroup Employee
+     *
+     * @apiSuccess {Object} EmployeesLanguages
+     * @apiSuccessExample Success-Response:
+     HTTP/1.1 200 OK
+     {
+         "data": [
+             {
+                 "_id": "5301e61b3d8b9898d5896e67",
+                 "attachments": [],
+                 "name": "English"
+             }
+         ]
+     }
+     */
+
+    F.route('/erp/api/languages', getLanguages, ['authorize']);
+    F.route('/erp/api/countries', getCountries, ['authorize']);
+    F.route('/erp/api/currencies', getCurrencies, ['authorize']);
     F.route('/erp/api/extrafield', load_extrafield, ['authorize']);
     F.route('/erp/api/sendEmail', sendEmail, ['post', 'json', 'authorize']);
     F.route('/erp/api/task/count', task_count, ['authorize']);
@@ -20,7 +131,11 @@ exports.install = function() {
         if (this.query.type) {
             ProductModel.find({}, function(err, docs) {
                 for (var i = 0, len = docs.length; i < len; i++) {
-                    ProductModel.update({ _id: docs[i]._id }, { 'type': 'PRODUCT' }, function(err, doc) {
+                    ProductModel.update({
+                        _id: docs[i]._id
+                    }, {
+                        'type': 'PRODUCT'
+                    }, function(err, doc) {
                         if (err)
                             console.log(err);
                     });
@@ -31,7 +146,11 @@ exports.install = function() {
         if (this.query.price) {
             ProductModel.find({}, function(err, docs) {
                 for (var i = 0, len = docs.length; i < len; i++) {
-                    ProductModel.update({ _id: docs[i]._id }, { 'prices.pu_ht': docs[i].pu_ht }, function(err, doc) {
+                    ProductModel.update({
+                        _id: docs[i]._id
+                    }, {
+                        'prices.pu_ht': docs[i].pu_ht
+                    }, function(err, doc) {
                         if (err)
                             console.log(err);
                     });
@@ -41,7 +160,11 @@ exports.install = function() {
         if (this.query.pricelevel) {
             PriceLevelModel.find({}, function(err, docs) {
                 for (var i = 0, len = docs.length; i < len; i++) {
-                    PriceLevelModel.update({ _id: docs[i]._id }, { 'prices.pu_ht': docs[i].pu_ht }, function(err, doc) {
+                    PriceLevelModel.update({
+                        _id: docs[i]._id
+                    }, {
+                        'prices.pu_ht': docs[i].pu_ht
+                    }, function(err, doc) {
                         if (err)
                             console.log(err);
                     });
@@ -49,7 +172,9 @@ exports.install = function() {
             });
         }
 
-        this.json({ ok: true });
+        this.json({
+            ok: true
+        });
     }, ['authorize']);
     F.route('/erp/api/product/convert_tva', function() {
         DictModel.findOne({
@@ -70,7 +195,7 @@ exports.install = function() {
         });
     }, ['authorize']);
     F.route('/erp/convert/resource', convert_resource, ['authorize']);
-    F.route('/erp/convert/{type}', convert);
+    F.route('/erp/convert/{type}', convert, []);
 
 
     // SHOW LAST 50 PROBLEMS
@@ -166,6 +291,7 @@ function view_500() {
 
 function sendEmail() {
     var self = this;
+    const EntityModel = MODEL('entity').Schema;
 
     //console.log(self.body);
 
@@ -179,30 +305,48 @@ function sendEmail() {
 
     //console.log(self.body);
 
-    self.body.data.entity = self.body.data.entity.charAt(0).toUpperCase() + self.body.data.entity.slice(1);
+    if (!self.body.data.entity)
+        return self.throw500('No entity');
 
-    var dest = [];
-    if (typeof self.body.to == 'object' && self.body.to.length)
-        dest = _.pluck(self.body.to, 'email');
-    else
-        dest = self.body.to;
+    EntityModel.findById(self.body.data.entity, function(err, entity) {
+        if (err || !entity)
+            return self.throw500('Entity unknown');
 
-    if (!dest || !dest.length)
-        return self.throw500('No destinataire');
+        self.body.entity = entity;
 
-    console.log(dest);
+        var dest = [];
+        if (typeof self.body.to == 'object' && self.body.to.length)
+            dest = _.pluck(self.body.to, 'email');
+        else
+            dest = [self.body.to];
 
-    //Send an email
-    self.mail(dest, self.body.data.entity + " - " + self.body.data.title, self.body.ModelEmail, self.body.data);
+        if (!dest || !dest.length)
+            return self.throw500('No destinataire');
 
-    if (self.config['mail.address.copy'])
-        self.mail(self.config['mail.address.copy'], self.body.data.entity + " - " + self.body.data.title, self.body.ModelEmail, self.body.data);
+        //console.log(dest);
 
-    self.json({
-        successNotify: {
-            title: "Mail envoye",
-            message: self.body.to.length + " mail(s) envoye(s)"
-        }
+        //Send an email
+        self.mail(dest, entity.name + " - " + self.body.data.title, self.body.ModelEmail, self.body.data, function(err) {
+            if (err) {
+                console.log(err);
+                return self.json({
+                    errorNotify: {
+                        title: 'Erreur',
+                        message: err
+                    }
+                });
+            }
+
+            self.json({
+                successNotify: {
+                    title: "Mail envoye",
+                    message: dest + " mail(s) envoye(s)"
+                }
+            });
+        });
+
+        if (self.config['mail.address.copy'])
+            self.mail(self.config['mail.address.copy'], self.body.data.entity + " - " + self.body.data.title, self.body.ModelEmail, self.body.data);
     });
 }
 
@@ -227,29 +371,59 @@ function task_count() {
 
     switch (params.query) {
         case 'MYTASK':
-            query.$or = [
-                { 'usertodo.id': params.user, 'userdone.id': null },
-                { 'author.id': params.user, archived: false }
+            query.$or = [{
+                    'usertodo.id': params.user,
+                    'userdone.id': null
+                },
+                {
+                    'author.id': params.user,
+                    archived: false
+                }
             ];
             break;
         case 'ALLTASK':
-            query.$or = [
-                { 'usertodo.id': params.user, 'userdone.id': null },
-                { 'author.id': params.user, archived: false },
-                { entity: params.entity, archived: false }
+            query.$or = [{
+                    'usertodo.id': params.user,
+                    'userdone.id': null
+                },
+                {
+                    'author.id': params.user,
+                    archived: false
+                },
+                {
+                    entity: params.entity,
+                    archived: false
+                }
             ];
             break;
         case 'MYARCHIVED':
-            query.$or = [
-                { 'usertodo.id': params.user, 'userdone.id': { $ne: null } },
-                { 'author.id': params.user, archived: true }
+            query.$or = [{
+                    'usertodo.id': params.user,
+                    'userdone.id': {
+                        $ne: null
+                    }
+                },
+                {
+                    'author.id': params.user,
+                    archived: true
+                }
             ];
             break;
         case 'ARCHIVED':
-            query.$or = [
-                { 'usertodo.id': params.user, 'userdone.id': { $ne: null } },
-                { 'author.id': params.user, archived: true },
-                { entity: params.entity, archived: true }
+            query.$or = [{
+                    'usertodo.id': params.user,
+                    'userdone.id': {
+                        $ne: null
+                    }
+                },
+                {
+                    'author.id': params.user,
+                    archived: true
+                },
+                {
+                    entity: params.entity,
+                    archived: true
+                }
             ];
             break;
         default: //'ARCHIVED':
@@ -257,7 +431,9 @@ function task_count() {
     }
 
     TaskModel.count(query, function(err, count) {
-        self.json({ count: count });
+        self.json({
+            count: count
+        });
     });
 }
 
@@ -272,207 +448,16 @@ function convert(type) {
     console.log(type);
 
     switch (type) {
-        case 'user':
-            var UserModel = MODEL('hr').Schema;
 
-            mongoose.connection.db.collection('users', function(err, collection) {
-                collection.find({ _type: null }, function(err, users) {
-                    if (err)
-                        return console.log(err);
-
-                    users.each(function(err, user) {
-
-                        if (user == null)
-                            return self.plain("Converted Users...");
-
-
-                        user.username = user.name;
-                        var id = user._id;
-                        delete user._id;
-                        delete user.name;
-
-                        if (user.Status !== 'ENABLE')
-                            delete user.password;
-
-                        //console.log(user);
-
-                        var newUser = new UserModel(user);
-                        //console.log(newUser);
-                        collection.deleteOne({ _id: id }, function(err, results) {
-                            if (err)
-                                return console.log(err);
-
-                            newUser.save(function(err, doc) {
-                                if (err || !doc)
-                                    return console.log("Impossible de creer ", err);
-                            });
-
-                        });
-
-                    });
-
-                });
-            });
-            return self.plain("Type is user");
-            break;
-
-        case 'contact':
-            var UserModel = MODEL('contact').Schema;
-            mongoose.connection.db.collection('users', function(err, collection) {
-                collection.find({}, function(err, users) {
-                    users.each(function(err, user) {
-                        if (user && user.societe && user.societe.id)
-                            UserModel.update({ _id: user._id }, { $set: { societe: user.societe.id } }, { upsert: false, multi: false }, function(err, result) {
-                                //console.log(err, result);
-                            });
-                    });
-                });
-            });
-
-            mongoose.connection.db.collection('Contact', function(err, collection) {
-                collection.find({}).toArray(function(err, contacts) {
-                    if (err)
-                        return console.log(err);
-
-                    async.each(contacts, function(contact, cb) {
-
-
-                        if (contact == null)
-                            return self.plain("Converted contacts...");
-
-                        var id = contact._id;
-                        if (!contact.email)
-                            delete contact.email;
-
-                        contact.oldId = "TESTING";
-
-                        if (contact.Status == 'ST_ENABLE')
-                            contact.Status = 'ENABLE';
-                        else if (contact.Status == 'ST_DISABLE')
-                            contact.Status = 'DISABLE';
-                        else
-                            contact.Status = 'NEVER';
-
-                        if (contact.societe && contact.societe.id)
-                            contact.societe = contact.societe.id;
-                        else
-                            delete contact.societe;
-
-                        //console.log(contact);
-
-                        var newUser = new UserModel(contact);
-                        //console.log(contact);
-
-                        newUser.save(cb);
-                    }, function(err) {
-                        if (err)
-                            return console.log("Impossible de creer ", err);
-
-                        collection.remove(function(err) {
-                            if (err)
-                                console.log(err);
-                        });
-
-                    });
-
-                });
-
-
-            });
-            return self.plain("Type is contact");
-            break;
-
-        case 'price_level':
-            var PriceLevelModel = MODEL('pricelevel').Schema;
-            mongoose.connection.db.collection('PriceLevel', function(err, collection) {
-                collection.find({}, function(err, pricelevels) {
-                    if (err)
-                        return console.log(err);
-
-                    pricelevels.each(function(err, pricelevel) {
-                        //console.log(pricelevel);
-                        if (err)
-                            return console.log(err);
-
-                        if (!pricelevel)
-                            return;
-
-                        if (pricelevel.product && !pricelevel.product.id)
-                            return self.plain("Converted pricelevel...");
-
-
-
-                        PriceLevelModel.update({ _id: pricelevel._id }, { $set: { product: pricelevel.product.id } }, function(err, doc) {
-                            if (err || !doc)
-                                return console.log("Impossible de creer ", err);
-                        });
-
-                    });
-                });
-            });
-            return self.plain("Type is price_level");
-            break;
-
-        case 'product':
-            var ProductModel = MODEL('product').Schema;
-            mongoose.connection.db.collection('Product', function(err, collection) {
-                collection.find({}, function(err, docs) {
-                    if (err)
-                        return console.log(err);
-
-                    docs.each(function(err, doc) {
-                        //console.log(pricelevel);
-                        if (err)
-                            return console.log(err);
-
-                        if (!doc)
-                            return;
-
-                        if (doc.name)
-                            return self.plain("Converted product...");
-
-                        ProductModel.update({ _id: doc._id }, { $set: { name: doc.ref } }, function(err, doc) {
-                            if (err || !doc)
-                                return console.log("Impossible de creer ", err);
-                        });
-
-                    });
-                });
-            });
-            return self.plain("Type is product");
-            break;
-
-        case 'deliveryAddress':
-            var SocieteModel = MODEL('societe').Schema;
-
-            SocieteModel.find({}, function(err, docs) {
-                if (err)
-                    return console.log(err);
-
-                docs.forEach(function(doc) {
-                    doc.addresses = [{
-                        name: doc.name,
-                        address: doc.address,
-                        zip: doc.zip,
-                        town: doc.town
-                    }];
-                    doc.deliveryAddress = 0;
-
-                    return doc.save(function(err, doc) {
-                        if (err)
-                            console.log(err);
-                    });
-
-                });
-
-
-            });
-            return self.plain("Type is deliveryAddress");
-            break;
         case 'code_compta':
-            var SocieteModel = MODEL('societe').Schema;
+            var SocieteModel = MODEL('Customers').Schema;
 
-            SocieteModel.find({ code_compta: null, code_client: { $ne: null } }, function(err, docs) {
+            SocieteModel.find({
+                code_compta: null,
+                code_client: {
+                    $ne: null
+                }
+            }, function(err, docs) {
                 if (err)
                     return console.log(err);
 
@@ -494,170 +479,138 @@ function convert(type) {
             return self.plain("Type is code_compta");
             break;
 
-        case 'offer':
-            var OfferModel = MODEL('offer').Schema;
-            mongoose.connection.db.collection('Offer', function(err, collection) {
-                collection.find({}, function(err, docs) {
-                    if (err)
-                        return console.log(err);
 
-                    docs.each(function(err, doc) {
-                        //console.log(pricelevel);
-                        if (err)
-                            return console.log(err);
 
-                        if (!doc)
-                            return;
 
-                        var set = {};
 
-                        if (doc.bl[0].societe && doc.bl[0].societe.name)
-                            set["bl.0.name"] = doc.bl[0].societe.name;
+        case 'price_level_new':
+            var PriceLevelModel = MODEL('pricelevel').Schema;
+            var ProductPricesModel = MODEL('productPrices').Schema;
+            var PriceListModel = MODEL('priceList').Schema;
+            var ProductModel = MODEL('product').Schema;
 
-                        if (doc.ref.length == 15)
-                            set.ref = "PC" + doc.ref.substring(4);
-
-                        OfferModel.update({ _id: doc._id }, { $set: set }, function(err, doc) {
-                            if (err || !doc)
-                                return console.log("Impossible de creer ", err);
-                        });
-
-                    });
-                });
-            });
-            return self.plain("Type is offer");
-            break;
-        case 'order':
-            var OrderModel = MODEL('order').Schema;
-            mongoose.connection.db.collection('Commande', function(err, collection) {
-                collection.find({}, function(err, docs) {
-                    if (err)
-                        return console.log(err);
-
-                    docs.each(function(err, doc) {
-                        //console.log(pricelevel);
-                        if (err)
-                            return console.log(err);
-
-                        if (!doc)
-                            return;
-
-                        var set = {};
-
-                        if (doc.bl[0].societe && doc.bl[0].societe.name)
-                            set["bl.0.name"] = doc.bl[0].societe.name;
-
-                        if (doc.ref.length == 15)
-                            set.ref = "CO" + doc.ref.substring(4);
-
-                        OrderModel.update({ _id: doc._id }, { $set: set }, function(err, doc) {
-                            if (err || !doc)
-                                return console.log("Impossible de creer ", err);
-                        });
-
-                    });
-                });
-            });
-            return self.plain("Type is order");
-            break;
-        case 'date_bill':
-            var BillModel = MODEL('bill').Schema;
-            var BillSupplierModel = MODEL('billSupplier').Schema;
-            var setDate = MODULE('utils').setDate;
-            var moment = require('moment');
-
-            BillModel.find({}, "_id datec dater", function(err, docs) {
-                docs.forEach(function(elem) {
-                    //console.log(elem);
-
-                    //FIX 29/02 !!! replace 28/02
-                    //console.log(moment(elem.datec).day());
-                    if (moment(elem.datec).month() == 1 && moment(elem.datec).date() == 29)
-                        elem.datec = moment(elem.datec).subtract(1, 'day').toDate();
-
-                    elem.update({ $set: { datec: setDate(elem.datec), dater: setDate(elem.dater) } }, { w: 1 }, function(err, doc) {
-                        if (err)
-                            console.log(err);
-
-                        //console.log(doc);
-                    });
-                });
-            });
-
-            BillSupplierModel.find({}, "_id datec dater", function(err, docs) {
-                docs.forEach(function(elem) {
-                    //console.log(elem);
-
-                    //FIX 29/02 !!! replace 28/02
-                    //console.log(moment(elem.datec).day());
-                    if (moment(elem.datec).month() == 1 && moment(elem.datec).date() == 29)
-                        elem.datec = moment(elem.datec).subtract(1, 'day').toDate();
-
-                    elem.update({ $set: { datec: setDate(elem.datec), dater: setDate(elem.dater) } }, { w: 1 }, function(err, doc) {
-                        if (err)
-                            console.log(err);
-
-                        //console.log(doc);
-                    });
-                });
-            });
-            self.plain('Convert date bill is ok');
-            break;
-        case 'date_delivery':
-
-            var DeliveryModel = MODEL('delivery').Schema;
-            var setDate = MODULE('utils').setDate;
-            var moment = require('moment');
-
-            DeliveryModel.find({}, "_id datec datedl", function(err, docs) {
-                docs.forEach(function(elem) {
-                    //console.log(elem);
-
-                    elem.update({ $set: { datec: setDate(elem.datec), datedl: setDate(elem.datedl) } }, { w: 1 }, function(err, doc) {
-                        if (err)
-                            console.log(err);
-
-                        //console.log(doc);
-                    });
-                });
-            });
-
-            self.plain('Convert date delivery is ok');
-            break;
-        case 'paymentTransactionBills':
-            /* Convert objectId to string */
-            var TransactionModel = MODEL('transaction').Schema;
-
-            //Select only objectId()
-            TransactionModel.find({ "meta.bills.billId": { $type: 7 } }, function(err, docs) {
-                if (err)
-                    return console.log(err);
-
+            // Add groupId to all products
+            ProductModel.find({}, "_id", function(err, docs) {
                 docs.forEach(function(doc) {
-
-                    var bills = doc.meta.bills;
-
-                    for (var i = 0, len = bills.length; i < len; i++)
-                        bills[i].billId = bills[i].billId.toString();
-
-
-                    //console.log(bills);
-
-                    doc.update({ $set: { "meta.bills": bills } }, function(err, doc) {
-
-                        //doc.save(function(err, doc) {
-                        if (err)
-                            console.log(err);
+                    ProductModel.update({
+                        _id: doc._id
+                    }, {
+                        $set: {
+                            groupId: doc._id.toString()
+                        }
+                    }, function(err, result) {
+                        //console.log(err, result);
                     });
                 });
-
             });
-            return self.plain("Type is paymentTransaction");
+
+            async.series([
+                    function(cb) {
+                        /* BASE price list */
+                        PriceListModel.findOne({
+                            priceListCode: "BASE"
+                        }, function(err, priceList) {
+                            if (priceList)
+                                return;
+
+                            priceList = new PriceListModel({
+                                priceListCode: "BASE",
+                                name: "Default price base",
+                                currency: "EUR",
+                                cost: false
+                            });
+
+                            return priceList.save();
+                        });
+
+                        /* SP price list for supplier */
+                        PriceListModel.findOne({
+                            priceListCode: "SP"
+                        }, function(err, priceList) {
+                            if (priceList)
+                                return;
+
+                            priceList = new PriceListModel({
+                                priceListCode: "SP",
+                                name: "Default supplier price base",
+                                currency: "EUR",
+                                cost: true
+                            });
+
+                            return priceList.save();
+                        });
+
+                        PriceLevelModel.distinct("price_level", function(err, docs) {
+                            async.each(docs, function(doc, callback) {
+                                PriceListModel.findOne({
+                                    priceListCode: MODULE('utils').set_Space(doc)
+                                }, function(err, priceList) {
+                                    if (priceList)
+                                        return callback();
+
+                                    priceList = new PriceListModel({
+                                        priceListCode: doc,
+                                        name: doc,
+                                        currency: "EUR",
+                                        cost: false
+                                    });
+
+                                    priceList.save(callback);
+                                });
+                            }, cb);
+                        });
+                    },
+                    function(cb) {
+                        // add prices to productPrice
+                        PriceLevelModel.find({}, function(err, docs) {
+                            async.each(docs, function(doc, callback) {
+                                PriceListModel.findOne({
+                                    priceListCode: MODULE('utils').set_Space(doc.price_level)
+                                }, function(err, priceList) {
+                                    if (!priceList)
+                                        return console.log("PriceList notfound");
+
+                                    ProductPricesModel.findOne({
+                                        priceLists: priceList._id,
+                                        product: doc.product
+                                    }, function(err, price) {
+                                        if (!price)
+                                            price = new ProductPricesModel({
+                                                priceLists: priceList._id,
+                                                product: doc.product,
+                                                prices: []
+                                            });
+
+                                        /* add prices */
+                                        price.prices = [];
+
+                                        price.prices.push({
+                                            price: doc.prices.pu_ht,
+                                            count: 0
+                                        });
+
+                                        if (doc.prices.pricesQty)
+                                            for (var key in doc.prices.pricesQty)
+                                                price.prices.push({
+                                                    price: doc.prices.pricesQty[key],
+                                                    count: parseInt(key)
+                                                });
+
+                                        price.save(callback);
+
+                                    });
+                                });
+                            });
+                        });
+                    }
+                ],
+                function(result) {});
+            return self.plain("Type is price_level new format !!!");
             break;
         case 'commercial_id':
-            var BillModel = MODEL('bill').Schema;
-            var SocieteModel = MODEL('societe').Schema;
-            var UserModel = MODEL('hr').Schema;
+            var BillModel = MODEL('invoice').Schema;
+            var SocieteModel = MODEL('Customers').Schema;
+            var UserModel = MODEL('Users').Schema;
             var OfferModel = MODEL('offer').Schema;
             var OrderModel = MODEL('order').Schema;
             var OrderSupplierModel = MODEL('orderSupplier').Schema;
@@ -684,7 +637,11 @@ function convert(type) {
 
             Collections.forEach(function(model) {
                 mongoose.connection.db.collection(model, function(err, collection) {
-                    collection.find({ "commercial_id.id": { $type: 2 } }, function(err, docs) {
+                    collection.find({
+                        "commercial_id.id": {
+                            $type: 2
+                        }
+                    }, function(err, docs) {
                         if (err)
                             return console.log(err);
                         //console.log(docs);
@@ -702,12 +659,21 @@ function convert(type) {
                                   });*/
                             //console.log(doc.commercial_id.id.substr(0, 5));
                             if (doc.commercial_id.id.substr(0, 5) == 'user:') //Not an automatic code
-                                UserModel.findOne({ username: doc.commercial_id.id.substr(5).toLowerCase() }, "_id lastname firstname", function(err, user) {
+                                UserModel.findOne({
+                                username: doc.commercial_id.id.substr(5)
+                            }, "_id lastname firstname", function(err, user) {
 
                                 //console.log(user);
                                 //return;
 
-                                collection.update({ _id: doc._id }, { $set: { 'commercial_id.id': user._id, 'commercial_id.name': user.fullname } }, function(err, doc) {
+                                collection.update({
+                                    _id: doc._id
+                                }, {
+                                    $set: {
+                                        'commercial_id.id': user._id,
+                                        'commercial_id.name': user.fullname
+                                    }
+                                }, function(err, doc) {
                                     if (err)
                                         console.log(err);
                                 });
@@ -926,98 +892,179 @@ function convert(type) {
             });
             return self.plain("Type is commercial_id");
             break;
-        case 'requestBuyEE':
-            var UserModel = MODEL('hr').Schema;
-            var RequestBuyModel = MODEL('europexpress_buy').Schema;
-            var OrderSupplierModel = MODEL('orderSupplier').Schema;
+        case 'bill_reset_commercial':
+            var BillModel = MODEL('invoice').Schema;
 
             RequestBuyModel.find({})
                 //.populate("client.id", "_id name commercial_id")
                 .exec(function(err, docs) {
-                    docs.forEach(function(elem) {
-                        console.log(elem);
+                        docs.forEach(function(elem) {
+                            console.log(elem);
 
-                        var order = new OrderSupplierModel({
-                            ref: elem.ref,
-                            createdAt: elem.createdAt,
-                            updatedAt: elem.updatedAt,
-                            ref_supplier: elem.title,
-                            datec: elem.datec,
-                            date_livraison: elem.date_livraison,
-                            Status: elem.Status,
-                            notes: [{
-                                author: {},
+                            var order = new OrderSupplierModel({
+                                ref: elem.ref,
+                                createdAt: elem.createdAt,
+                                updatedAt: elem.updatedAt,
+                                ref_supplier: elem.title,
                                 datec: elem.datec,
-                                note: elem.desc
-                            }],
-                            author: {},
-                            supplier: elem.fournisseur,
-                            optional: { SN: elem.vehicule.id },
-                            entity: self.user.entity
-                        });
+                                date_livraison: elem.date_livraison,
+                                Status: elem.Status,
+                                notes: [{
+                                    author: {},
+                                    datec: elem.datec,
+                                    note: elem.desc
+                                }],
+                                author: {},
+                                supplier: elem.fournisseur,
+                                optional: { SN: elem.vehicule.id },
+                                entity: self.user.entity
+                            });
 
-                        //if (elem.author.id.substr(0, 5) == 'user:') //Not an automatic code
-                        UserModel.findOne({ username: elem.author.id.substr(5).toLowerCase() }, "_id lastname firstname", function(err, user) {
+                            //if (elem.author.id.substr(0, 5) == 'user:') //Not an automatic code
+                            UserModel.findOne({ username: elem.author.id.substr(5).toLowerCase() }, "_id lastname firstname", function(err, user) {
 
-                            //console.log(user);
-                            //return;
+                                //console.log(user);
+                                //return;
 
-                            order.author = {
-                                id: user._id,
-                                name: user.fullname
-                            }
+                                elem.update({
+                                    $set: {
+                                        commercial_id: elem.client.id.commercial_id
+                                    }
+                                }, {
+                                    w: 1
+                                }, function(err, doc) {
+                                    if (err)
+                                        console.log(err);
 
-                            order.notes[0].author = order.author;
-
-                            order.save(function(err, doc) {
-                                if (err)
-                                    return console.log(err);
+                                    //console.log(doc);
+                                }); * /
                             });
                         });
+                        return self.plain("Type is requestBuyEE : Pensez a mettre le max ref dans la sequence !");
+                        break;
+                        case 'customerRef':
+                            var CustomerModel = MODEL('Customers').Schema;
 
-                        /*elem.update({ $set: { commercial_id: elem.client.id.commercial_id } }, { w: 1 }, function(err, doc) {
-                            if (err)
-                                console.log(err);
+                            CustomerModel.find({
+                                    $where: 'this.salesPurchases.ref.length > 7'
+                                })
+                                .exec(function(err, docs) {
+                                    docs.forEach(function(elem) {
+                                        //console.log(elem);
 
-                            //console.log(doc);
-                        });*/
+                                        elem.salesPurchases.ref = elem.salesPurchases.ref.substring(1, 8);
+                                        elem.save();
+                                    });
+                                });
+                            return self.plain("Type is customerRef Ok");
+                            break;
+
+                    }
+
+                    /**
+                     * TODO schema conversion 5/04/2017
+                     * Schema company
+                     * commercial_id.id -> commercial_id
+                     * cptBilling.id -> cptBilling
+                     */
+
+
+
+                    return self.plain("Type is unknown");
+                }
+
+            function convert_resource() {
+                var self = this;
+                //var fixedWidthString = require('fixed-width-string'); //on déclare l'indentation
+                fs.readdirSync(__dirname + '/../locales/fr/')
+                    .filter(function(file) {
+                        return file.endsWith('.json');
+                    })
+
+                .forEach(function(file) {
+                    var readjson = require(__dirname + '/../locales/fr/' + file); // lecture fichier json
+                    var writeresource = fs.createWriteStream(__dirname + '/../resources/fr/' + file + 'fr.json');
+
+                    _.forEach(readjson, function(file) {
+                        /*if (value === "UTF-8")
+                         return;*/
+
+                        //var header = file.substring(0, file.length - 5);//delete .json 
+
+                        /* var temp = fixedWidthString(header + "_" + key, 80);
+                         temp += ": ";
+                         temp += value;
+                         temp += "\n";*/
+                        writeresource.write(readjson);
+
+                    });
+
+                });
+
+                writeresource.end();
+                self.plain("Ok"); //text
+            }
+
+            function getNationality() {
+                var self = this;
+                var Nationality = MODEL('nationality').Schema;
+
+                Nationality.find({}).exec(function(err, result) {
+                    if (err)
+                        return self.throw500(err);
+
+                    self.json({
+                        data: result
                     });
                 });
-            return self.plain("Type is requestBuyEE : Pensez a mettre le max ref dans la sequence !");
-            break;
-    }
+            }
 
-    return self.plain("Type is unknown");
-}
+            function getLanguages() {
+                var self = this;
+                var Languages = MODEL('languages').Schema;
 
-function convert_resource() {
-    var self = this;
-    //var fixedWidthString = require('fixed-width-string'); //on déclare l'indentation
-    fs.readdirSync(__dirname + '/../locales/fr/')
-        .filter(function(file) {
-            return file.endsWith('.json');
-        })
+                Languages.find({}).exec(function(err, result) {
+                    if (err)
+                        return self.throw500(err);
 
-    .forEach(function(file) {
-        var readjson = require(__dirname + '/../locales/fr/' + file); // lecture fichier json
-        var writeresource = fs.createWriteStream(__dirname + '/../resources/fr/' + file + 'fr.json');
+                    self.json({
+                        data: result
+                    });
+                });
+            }
 
-        _.forEach(readjson, function(file) {
-            /*if (value === "UTF-8")
-             return;*/
+            function getCountries() {
+                var self = this;
+                var Countries = MODEL('countries').Schema;
 
-            //var header = file.substring(0, file.length - 5);//delete .json 
+                Countries.find({})
+                    .sort({
+                        '_id': 1
+                    })
+                    .exec(function(err, result) {
+                        if (err)
+                            return self.throw500(err);
 
-            /* var temp = fixedWidthString(header + "_" + key, 80);
-             temp += ": ";
-             temp += value;
-             temp += "\n";*/
-            writeresource.write(readjson);
+                        self.json({
+                            data: result
+                        });
+                    });
+            }
 
-        });
+            function getCurrencies() {
+                var self = this;
+                var Currencies = MODEL('currency').Schema;
 
-    });
+                Currencies.find({})
+                    .sort({
+                        '_id': 1
+                    })
+                    .exec(function(err, result) {
+                        if (err)
+                            return self.throw500(err);
 
-    writeresource.end();
-    self.plain("Ok"); //text
-}
+                        self.json({
+                            data: result
+                        });
+                    });
+            }

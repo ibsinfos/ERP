@@ -1,5 +1,5 @@
-name                     : TM-js
-version                  : 0.5.001
+name                     : TM-CRM_ERP
+version                  : 0.6.0
 author                   : ToManage
 database                 : mongodb://127.0.0.1/mydatabase
 dateformatShort          : DD/MM/YYYY
@@ -26,15 +26,14 @@ google-secret            : 6Y02V5G96hXYd0xU3SpsoZ
 google-callback          : http://tm.tomanage.fr/login/google/callback
 
 //SMTP
-mail.smtp                       : smtp.gmail.com
-mail.smtp.options               : {"secure":true,"port":465,"user":"myemail@tomanage.fr","password":"mypassword","timeout":10000,"tls":true}
-mail.address.from               : tm-js@tomanage.fr
-mail.address.reply              : contact@tomanage.fr
-mail.address.bcc                :
-
-allow-websocket                 : false
+mail-smtp                       : smtp.gmail.com
+mail-smtp-options               : {"secure":true,"port":465,"user":"myemail@tomanage.fr","password":"mypassword","timeout":10000,"tls":true}
+mail-address-from               : tm-js@tomanage.fr
+mail-address-reply              : contact@tomanage.fr
+mail-address-bcc                :
 
 //offer.emailNotify				: herve.prot@tomanage.fr
 accounting.VTE			: BLO
 accounting.ACH			: BLU
- 
+
+storing-files		  : localfs 

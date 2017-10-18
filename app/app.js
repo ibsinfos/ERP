@@ -1,3 +1,26 @@
+/**
+Copyright 2017 ToManage
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+@author    ToManage SAS <contact@tomanage.fr>
+@copyright 2014-2017 ToManage SAS
+@license   http://www.apache.org/licenses/LICENSE-2.0 Apache License, Version 2.0
+International Registered Trademark & Property of ToManage SAS
+*/
+
+
+
 /***
  Metronic AngularJS App Main Script
  ***/
@@ -135,13 +158,19 @@ MetronicApp.factory('notifyToastr', ['$q', 'toastr', function($q, toastr) {
         response: function(response) {
             if (response.data && response.data.errorNotify) {
                 // Draw Notify
-                toastr.error(response.data.errorNotify.message, response.data.errorNotify.title || 'Error', { timeOut: 10000, progressBar: true });
+                toastr.error(response.data.errorNotify.message, response.data.errorNotify.title || 'Error', {
+                    timeOut: 10000,
+                    progressBar: true
+                });
                 return $q.reject(response); // Reject response
             }
 
             if (response.data && response.data.successNotify) {
                 // Draw Notify information
-                toastr.success(response.data.successNotify.message, response.data.successNotify.title || 'Error', { timeOut: 5000, progressBar: true });
+                toastr.success(response.data.successNotify.message, response.data.successNotify.title || 'Error', {
+                    timeOut: 5000,
+                    progressBar: true
+                });
             }
             return response;
         }
@@ -159,7 +188,7 @@ MetronicApp.factory('settings', ['$rootScope', function($rootScope) {
         layout: {
             pageSidebarClosed: false, // sidebar menu state
             pageBodySolid: false, // solid body color state
-            pageAutoScrollOnLoad: 1000 // auto scroll to top on page load
+            pageAutoScrollOnLoad: 0 // auto scroll to top on page load
         },
         layoutImgPath: Metronic.getAssetsPath() + 'admin/layout/img/',
         layoutCssPath: Metronic.getAssetsPath() + 'admin/layout/css/'
@@ -170,11 +199,22 @@ MetronicApp.factory('settings', ['$rootScope', function($rootScope) {
 /* Setup App Main Controller */
 MetronicApp.controller('AppController', ['$scope', '$rootScope', '$http', '$location', 'dialogs', 'websocketService', '$notification',
     function($scope, $rootScope, $http, $location, dialogs, websocketService, $notification) {
-        $rootScope.noteStatus = [
-            { id: "note-info", name: "Info" },
-            { id: "note-warning", name: "Warning" },
-            { id: "note-danger", name: "Danger" },
-            { id: "note-success", name: "Success" }
+        $rootScope.noteStatus = [{
+                id: "note-info",
+                name: "Info"
+            },
+            {
+                id: "note-warning",
+                name: "Warning"
+            },
+            {
+                id: "note-danger",
+                name: "Danger"
+            },
+            {
+                id: "note-success",
+                name: "Success"
+            }
         ];
 
         // accept notification
@@ -184,7 +224,11 @@ MetronicApp.controller('AppController', ['$scope', '$rootScope', '$http', '$loca
             });
 
         var login = function(userId) {
-            //websocketService.login('wss://' + $location.host() + ':' + $location.port() + '/erp/', userId);
+            //console.log(userId);
+            if ($location.$$protocol === "http")
+                websocketService.login('ws://' + $location.host() + ':' + $location.port() + '/erp/websocket/', userId);
+            else
+                websocketService.login('wss://' + $location.host() + ':' + $location.port() + '/erp/websocket/', userId);
             $rootScope.isLogged = true;
         };
 
@@ -217,15 +261,46 @@ MetronicApp.controller('AppController', ['$scope', '$rootScope', '$http', '$loca
             //console.log(data);
             $rootScope.entityList = data;
             $rootScope.entityListAll = data.slice(); // Copy array
-            $rootScope.entityListAll.push({ id: "ALL", name: "ALL" });
+            $rootScope.entityListAll.push({
+                id: "ALL",
+                name: "ALL"
+            });
         });
 
-        // Return url logo
-        $rootScope.getLogo = function(model, data) {
-            if (data.logo)
-                return "/erp/api/file/" + model + "/" + data.logo;
+        // Get Entity list
+        $http({
+            method: 'GET',
+            url: '/erp/api/languages'
+        }).success(function(data, status) {
+            //console.log(data);
+            $rootScope.languages = data.data;
+        });
+
+        $rootScope._language = 0;
+        $rootScope.setLanguage = function(idx) {
+            $rootScope._language = idx;
+        };
+
+        // Return url Image
+        $rootScope.getImage = function(model, data) {
+            if (data)
+                return "/erp/api/file/" + model + "/" + data;
             else
                 return "/assets/admin/layout/img/nophoto.jpg";
+        };
+
+        // toggle selection for a given soncas by value
+        $rootScope.toggleSelection = function toggleSelection(tab, value) {
+            var idx;
+            idx = tab.indexOf(value);
+
+            // is currently selected
+            if (idx > -1)
+                tab.splice(idx, 1);
+
+            // is newly selected
+            else
+                tab.push(value);
         };
 
         // Calcul la somme d'une liste
@@ -280,11 +355,11 @@ MetronicApp.controller('AppController', ['$scope', '$rootScope', '$http', '$loca
                     parts.push(encodeUriQuery(key) + '=' + encodeUriQuery(v));
                 });
             });
-            return url + ((url.indexOf('?') == -1) ? '?' : '&') + parts.join('&');
+            return url + ((url.indexOf('?') === -1) ? '?' : '&') + parts.join('&');
         };
 
         $rootScope.loadUsers = function() {
-            return $http.get('/erp/api/user/select').then(function(res) {
+            return $http.get('/erp/api/employees/getForDd').then(function(res) {
                 //console.log(res.data);
                 $rootScope.userList = res.data;
                 //return res.data;
@@ -309,7 +384,7 @@ MetronicApp.controller('AppController', ['$scope', '$rootScope', '$http', '$loca
                     }]
                 }
             }).then(function(res) {
-                //console.log(res.data);
+                console.log(res.data);
                 return res.data;
             });
         };
@@ -319,8 +394,6 @@ MetronicApp.controller('AppController', ['$scope', '$rootScope', '$http', '$loca
             formatYear: 'yy',
             startingDay: 1
         };
-
-
     }
 ]);
 
@@ -371,7 +444,7 @@ MetronicApp.controller('HeaderController', ['$scope', '$rootScope', '$http', '$n
          socket.on('refreshTask', function (data) {
          $scope.taskCounter();
          });
-         });*/
+        });*/
 
         $scope.ticketCounter = function() {
             $http({
@@ -406,9 +479,7 @@ MetronicApp.controller('HeaderController', ['$scope', '$rootScope', '$http', '$n
                 return;
 
             if (type === 'notify') {
-                var notification = $notification(data.title, {
-                    body: data.body
-                });
+                var notification = $notification(data.title, data.message);
 
                 if (data.url)
                     var deregister = notification.$on('click', function() {
@@ -451,6 +522,7 @@ MetronicApp.controller('SidebarController', ['$scope', '$rootScope', '$http',
         $scope.menus = {};
         $scope.menuTasks = [];
         $rootScope.showSearchInput = true;
+
         $scope.$on('$includeContentLoaded', function() {
             Layout.initSidebar(); // init sidebar
             $http({
@@ -458,6 +530,7 @@ MetronicApp.controller('SidebarController', ['$scope', '$rootScope', '$http',
                 url: '/erp/api/menus'
             }).success(function(data, status) {
                 $scope.menus = data;
+                //console.log(data, status);
             });
         });
 
@@ -495,7 +568,7 @@ MetronicApp.controller('QuickSidebarController', ['$scope', function($scope) {
     $scope.$on('$includeContentLoaded', function() {
         setTimeout(function() {
             QuickSidebar.init(); // init quick sidebar        
-        }, 2000)
+        }, 2000);
     });
 }]);
 
@@ -516,7 +589,7 @@ MetronicApp.config(['$stateProvider', '$urlRouterProvider', function($stateProvi
     // Redirect any unmatched url
     $urlRouterProvider.otherwise("/");
     $stateProvider
-    // Dashboard
+        // Dashboard
         .state('home', {
             url: "/",
             templateUrl: "/views/home/index.html",
@@ -585,234 +658,608 @@ MetronicApp.config(['$stateProvider', '$urlRouterProvider', function($stateProvi
                 pageTitle: 'Erreur'
             }
         })
-        // Devis
+        // Offer
         .state('offer', {
             url: "/offer",
             abstract: true,
-            templateUrl: "/views/_offer/index.html"
+            templateUrl: "/views/orders/index.html"
         })
         .state('offer.list', {
             url: "",
-            templateUrl: "/views/_offer/list.html",
+            templateUrl: "/views/orders/listoffer.html",
             data: {
                 pageTitle: 'Liste des devis'
             },
-            controller: "OfferController"
+            controller: "OfferListController"
         })
         .state('offer.show', {
-            parent: "offer",
+            parent: 'offer',
             url: "/{id:[0-9a-z]{24}}",
-            templateUrl: "/views/_offer/fiche.html",
+            templateUrl: "/views/orders/fiche.html",
             data: {
-                pageTitle: 'Offre'
+                pageTitle: 'Devis'
             },
-            controller: "OfferController"
+            controller: "OrdersController"
+        })
+        .state('offer.show.detail', {
+            templateUrl: "/views/orders/detail.html",
+            data: {
+                pageTitle: 'Devis'
+            }
         })
         .state('offer.create', {
             parent: "offer",
             url: "/create.html",
-            templateUrl: "/views/_offer/create.html",
+            templateUrl: "/views/orders/detail.html",
             data: {
                 pageTitle: 'Nouvelle offre'
             },
-            controller: "OfferController"
+            controller: "OrdersController"
         })
         // Order
         .state('order', {
             url: "/order",
             abstract: true,
-            templateUrl: "/views/_order/index.html"
+            templateUrl: "/views/orders/index.html"
         })
         .state('order.list', {
             url: "",
-            templateUrl: "/views/_order/list.html",
+            templateUrl: "/views/orders/listorder.html",
             data: {
                 pageTitle: 'Liste des commandes'
             },
-            controller: "OrderController"
+            controller: "OrderListController"
         })
         .state('order.show', {
-            parent: "order",
             url: "/{id:[0-9a-z]{24}}",
-            templateUrl: "/views/_order/fiche.html",
+            templateUrl: "/views/orders/fiche.html",
             data: {
                 pageTitle: 'Commande'
             },
-            controller: "OrderController"
+            controller: "OrdersController"
+        })
+        .state('order.show.detail', {
+            templateUrl: "/views/orders/detail.html",
+            data: {
+                pageTitle: 'Commande'
+            }
         })
         .state('order.create', {
             parent: "order",
             url: "/create.html",
-            templateUrl: "/views/_order/create.html",
+            templateUrl: "/views/orders/detail.html",
             data: {
                 pageTitle: 'Nouvelle commande'
             },
-            controller: "OrderController"
+            controller: "OrdersController"
         })
         // Delivery
         .state('delivery', {
             url: "/delivery",
             abstract: true,
-            templateUrl: "/views/_delivery/index.html"
+            templateUrl: "/views/orders/index.html"
         })
         .state('delivery.list', {
             url: "",
-            templateUrl: "/views/_delivery/list.html",
+            templateUrl: "/views/orders/listdelivery.html",
             data: {
                 pageTitle: 'Liste des bons de livraison'
             },
-            controller: "DeliveryController"
+            controller: "DeliveryListController"
         })
         .state('delivery.show', {
             parent: "delivery",
             url: "/{id:[0-9a-z]{24}}",
-            templateUrl: "/views/_delivery/fiche.html",
+            templateUrl: "/views/orders/fiche.html",
             data: {
                 pageTitle: 'Bon de livraison'
             },
-            controller: "DeliveryController"
+            controller: "OrdersController"
+        })
+        .state('delivery.show.detail', {
+            templateUrl: "/views/orders/detail.html",
+            data: {
+                pageTitle: 'Bon de livraison'
+            }
         })
         .state('delivery.create', {
             parent: "delivery",
             url: "/create.html",
-            templateUrl: "/views/_delivery/create.html",
+            templateUrl: "/views/orders/detail.html",
             data: {
-                pageTitle: 'Nouveau bon de livraison'
+                pageTitle: 'Nouveau bon de livraion'
             },
-            controller: "DeliveryController"
+            controller: "OrdersController"
         })
         // Bill
         .state('bill', {
             url: "/bill",
             abstract: true,
-            templateUrl: "/views/_bill/index.html"
+            templateUrl: "/views/orders/index.html"
         })
         .state('bill.list', {
             url: "?Status",
-            templateUrl: "/views/_bill/list.html",
+            templateUrl: "/views/orders/listbill.html",
             data: {
                 pageTitle: 'Liste des factures clients'
             },
-            controller: "BillController"
+            controller: "BillListController"
         })
         .state('bill.show', {
-            parent: "bill",
             url: "/{id:[0-9a-z]{24}}",
-            templateUrl: "/views/_bill/fiche.html",
+            templateUrl: "/views/orders/fiche.html",
             data: {
                 pageTitle: 'Facture client'
             },
-            controller: "BillController"
+            controller: "OrdersController"
+        })
+        .state('bill.show.detail', {
+            templateUrl: "/views/orders/detail.html",
+            data: {
+                pageTitle: 'Facture client'
+            }
+        })
+        .state('bill.show.payment', {
+            url: "/payment",
+            templateUrl: "/views/bank/paymentList.html",
+            data: {
+                pageTitle: 'Reglement client'
+            },
+            controller: "PaymentController"
+        })
+        .state('bill.show.payment.create', {
+            //parent: "payment",
+            url: "?societe&entity",
+            templateUrl: "/views/bank/createPayment.html",
+            data: {
+                pageTitle: 'Nouveau règlement'
+            },
+            controller: "PaymentController"
         })
         .state('bill.create', {
             parent: "bill",
             url: "/create.html",
-            templateUrl: "/views/_bill/create.html",
+            templateUrl: "/views/orders/detail.html",
             data: {
-                pageTitle: 'Nouvelle facture client'
+                pageTitle: 'Nouvelle facture'
             },
-            controller: "BillController"
+            controller: "OrdersController"
         })
-        // Order Supplier
-        .state('orderSupplier', {
-            url: "/orderSupplier",
+        // OrderSupplier
+        .state('ordersupplier', {
+            url: "/ordersupplier",
             abstract: true,
-            templateUrl: "/views/_order_supplier/index.html"
+            templateUrl: "/views/suppliers/index.html"
         })
-        .state('orderSupplier.list', {
+        .state('ordersupplier.list', {
             url: "",
-            templateUrl: "/views/_order_supplier/list.html",
+            templateUrl: "/views/suppliers/listorder.html",
             data: {
-                pageTitle: 'Liste des commandes fournisseurs'
+                pageTitle: 'Liste des commandes'
             },
-            controller: "OrderSupplierController"
+            controller: "OrderSupplierListController"
         })
-        .state('orderSupplier.show', {
-            parent: "orderSupplier",
+        .state('ordersupplier.show', {
             url: "/{id:[0-9a-z]{24}}",
-            templateUrl: "/views/_order_supplier/fiche.html",
+            templateUrl: "/views/suppliers/fiche.html",
             data: {
-                pageTitle: 'Commande fournisseur'
+                pageTitle: 'Commande'
             },
-            controller: "OrderSupplierController"
+            controller: "OrdersController"
         })
-        .state('orderSupplier.create', {
-            parent: "orderSupplier",
-            url: "/create.html",
-            templateUrl: "/views/_order_supplier/create.html",
+        .state('ordersupplier.show.detail', {
+            templateUrl: "/views/suppliers/detail.html",
             data: {
-                pageTitle: 'Nouvelle commande fournisseur'
+                pageTitle: 'Commande'
+            }
+        })
+        .state('ordersupplier.create', {
+            parent: "ordersupplier",
+            url: "/create.html",
+            templateUrl: "/views/suppliers/detail.html",
+            data: {
+                pageTitle: 'Nouvelle commande'
             },
-            controller: "OrderSupplierController"
+            controller: "OrdersController"
         })
         // BillSupplier
-        .state('billSupplier', {
-            url: "/billSupplier",
+        .state('billsupplier', {
+            url: "/billsupplier",
             abstract: true,
-            templateUrl: "/views/_bill_supplier/index.html"
+            templateUrl: "/views/suppliers/index.html"
         })
-        .state('billSupplier.list', {
+        .state('billsupplier.list', {
             url: "",
-            templateUrl: "/views/_bill_supplier/list.html",
+            templateUrl: "/views/suppliers/listbill.html",
             data: {
-                pageTitle: 'Liste des factures fournisseurs'
+                pageTitle: 'Liste des factures'
             },
-            controller: "BillSupplierController"
+            controller: "BillSupplierListController"
         })
-        .state('billSupplier.show', {
-            parent: "billSupplier",
+        .state('billsupplier.show', {
             url: "/{id:[0-9a-z]{24}}",
-            templateUrl: "/views/_bill_supplier/fiche.html",
+            templateUrl: "/views/suppliers/fiche.html",
             data: {
-                pageTitle: 'Facture fournisseur'
+                pageTitle: 'Facture'
             },
-            controller: "BillSupplierController"
+            controller: "OrdersController"
         })
-        .state('billSupplier.create', {
-            parent: "billSupplier",
-            url: "/create.html",
-            templateUrl: "/views/_bill_supplier/create.html",
+        .state('billsupplier.show.detail', {
+            templateUrl: "/views/suppliers/detail.html",
             data: {
-                pageTitle: 'Nouvelle facture fournisseur'
+                pageTitle: 'Facture'
+            }
+        })
+        .state('billsupplier.show.payment', {
+            url: "/payment",
+            templateUrl: "/views/bank/paymentList.html",
+            data: {
+                pageTitle: 'Reglement client'
             },
-            controller: "BillSupplierController"
+            controller: "PaymentController"
+        })
+        .state('billsupplier.show.payment.create', {
+            //parent: "payment",
+            url: "?societe&entity",
+            templateUrl: "/views/bank/createPayment.html",
+            data: {
+                pageTitle: 'Nouveau règlement'
+            },
+            controller: "PaymentController"
+        })
+        .state('billsupplier.create', {
+            parent: "billsupplier",
+            url: "/create.html",
+            templateUrl: "/views/suppliers/detail.html",
+            data: {
+                pageTitle: 'Nouvelle Facture'
+            },
+            controller: "OrdersController"
+        })
+        // OfferSupplier
+        .state('offersupplier', {
+            url: "/offersupplier",
+            abstract: true,
+            templateUrl: "/views/suppliers/index.html"
+        })
+        .state('offersupplier.list', {
+            url: "",
+            templateUrl: "/views/suppliers/listoffer.html",
+            data: {
+                pageTitle: 'Liste des devis'
+            },
+            controller: "OfferSupplierListController"
+        })
+        .state('offersupplier.show', {
+            parent: 'offersupplier',
+            url: "/{id:[0-9a-z]{24}}",
+            templateUrl: "/views/suppliers/fiche.html",
+            data: {
+                pageTitle: 'Devis'
+            },
+            controller: "OrdersController"
+        })
+        .state('offersupplier.show.detail', {
+            templateUrl: "/views/suppliers/detail.html",
+            data: {
+                pageTitle: 'Devis'
+            }
+        })
+        .state('offersupplier.create', {
+            parent: "offersupplier",
+            url: "/create.html",
+            templateUrl: "/views/suppliers/detail.html",
+            data: {
+                pageTitle: 'Nouvelle offre'
+            },
+            controller: "OrdersController"
+        })
+        // Delivery Supplier
+        .state('deliverysupplier', {
+            url: "/deliverysupplier",
+            abstract: true,
+            templateUrl: "/views/suppliers/index.html"
+        })
+        .state('deliverysupplier.list', {
+            url: "",
+            templateUrl: "/views/suppliers/listdelivery.html",
+            data: {
+                pageTitle: 'Liste des bons de livraison'
+            },
+            controller: "DeliverySupplierListController"
+        })
+        .state('deliverysupplier.show', {
+            parent: "deliverysupplier",
+            url: "/{id:[0-9a-z]{24}}",
+            templateUrl: "/views/suppliers/fiche.html",
+            data: {
+                pageTitle: 'Bon de livraison'
+            },
+            controller: "OrdersController"
+        })
+        .state('deliverysupplier.show.detail', {
+            templateUrl: "/views/suppliers/detail.html",
+            data: {
+                pageTitle: 'Bon de livraison'
+            }
+        })
+        .state('deliverysupplier.create', {
+            parent: "deliverysupplier",
+            url: "/create.html",
+            templateUrl: "/views/suppliers/detail.html",
+            data: {
+                pageTitle: 'Nouveau bon de livraion'
+            },
+            controller: "OrdersController"
+        })
+        // Orders Fab
+        .state('ordersfab', {
+            url: "/ordersfab",
+            abstract: true,
+            templateUrl: "/views/ordersfab/index.html"
+        })
+        .state('ordersfab.list', {
+            url: "",
+            templateUrl: "/views/ordersfab/listordersfab.html",
+            data: {
+                pageTitle: 'Liste des Ordres de fabrications'
+            },
+            controller: "OrdersFabListController"
+        })
+        .state('ordersfab.show', {
+            parent: "ordersfab",
+            url: "/{id:[0-9a-z]{24}}",
+            templateUrl: "/views/ordersfab/fiche.html",
+            data: {
+                pageTitle: 'Ordre de fabrication'
+            },
+            controller: "OrdersController"
+        })
+        .state('ordersfab.show.detail', {
+            templateUrl: "/views/ordersfab/detail.html",
+            data: {
+                pageTitle: 'Ordre de fabrication'
+            }
+        })
+        .state('ordersfab.create', {
+            parent: "ordersfab",
+            url: "/create.html",
+            templateUrl: "/views/ordersfab/detail.html",
+            data: {
+                pageTitle: 'Nouvel ordre de fabrication'
+            },
+            controller: "OrdersController"
+        })
+        // Stock Return
+        .state('stockreturn', {
+            url: "/stockreturn",
+            abstract: true,
+            templateUrl: "/views/orders/index.html"
+        })
+        .state('stockreturn.list', {
+            url: "",
+            templateUrl: "/views/orders/liststockreturn.html",
+            data: {
+                pageTitle: 'Liste des retours'
+            },
+            controller: "StockReturnListController"
+        })
+        .state('stockreturn.create', {
+            parent: "stockreturn",
+            url: "/create.html",
+            templateUrl: "/views/orders/detail.html",
+            data: {
+                pageTitle: 'Nouveau retour produit'
+            },
+            controller: "OrdersController"
+        })
+        .state('stockreturn.show', {
+            parent: 'stockreturn',
+            url: "/{id:[0-9a-z]{24}}",
+            templateUrl: "/views/orders/fiche.html",
+            data: {
+                pageTitle: 'Retour produit'
+            },
+            controller: "OrdersController"
+        })
+        .state('stockreturn.show.detail', {
+            templateUrl: "/views/orders/detail.html",
+            data: {
+                pageTitle: 'Bon de retour'
+            },
+            controller: "OrdersController"
+        })
+        // Stock Correction
+        .state('product.stockcorrection', {
+            parent: "product",
+            url: "/stockcorrectionlist",
+            abstract: true,
+            templateUrl: "/views/product/index.html"
+        })
+        .state('product.stockcorrection.list', {
+            url: "",
+            templateUrl: "/views/product/stockcorrectionlist.html",
+            data: {
+                pageTitle: 'Liste des corrections de stock'
+            },
+            controller: "ProductStockCorrectionController"
+        })
+        .state('product.stockcorrection.create', {
+            url: "/create.html",
+            templateUrl: "/views/product/stockcorrectionlistfiche.html",
+            data: {
+                pageTitle: 'Créer une correction de stock'
+            },
+            controller: "ProductStockCorrectionController"
+        })
+        .state('product.stockcorrection.show', {
+            url: "/{id:[0-9a-z]{24}}",
+            templateUrl: "/views/product/stockcorrectionlistfiche.html",
+            data: {
+                pageTitle: 'Editer une correction de stock'
+            },
+            controller: "ProductStockCorrectionController"
+        })
+        // Stock Detail
+        .state('product.stockdetail', {
+            parent: "product",
+            url: "/stockdetail",
+            abstract: true,
+            templateUrl: "/views/product/index.html"
+        })
+        .state('product.stockdetail.list', {
+            url: "",
+            templateUrl: "/views/product/stockdetail.html",
+            data: {
+                pageTitle: 'Liste des états de stock'
+            },
+            controller: "ProductStockDetailController"
+        })
+        // Stock transfert
+        .state('product.stocktransfers', {
+            parent: "product",
+            url: "/stocktransfers",
+            abstract: true,
+            templateUrl: "/views/product/index.html"
+        })
+        .state('product.stocktransfers.list', {
+            url: "",
+            templateUrl: "/views/product/stocktransfers.html",
+            data: {
+                pageTitle: 'Liste des transferts de stock'
+            },
+            controller: "ProductStockTransfersController"
+        })
+        .state('product.stocktransfers.create', {
+            parent: "",
+            url: "/create.html",
+            templateUrl: "/views/product/informations.html",
+            data: {
+                pageTitle: 'Nouveau produit / service'
+            },
+            controller: "ProductStockTransfersController"
+        })
+        // Stock Inventory
+        .state('product.inventory', {
+            parent: "product",
+            url: "/inventory",
+            abstract: true,
+            templateUrl: "/views/product/index.html"
+        })
+        .state('product.inventory.list', {
+            url: "",
+            templateUrl: "/views/product/inventory.html",
+            data: {
+                pageTitle: 'Gestion des stock'
+            },
+            controller: "ProductInventoryController"
         })
         // Company
         .state('societe', {
             url: "/societe",
             abstract: true,
-            templateUrl: "/views/_company/index.html"
+            templateUrl: "/views/company/index.html"
         })
         .state('societe.list', {
-            url: "",
-            templateUrl: "/views/_company/list.html",
+            url: "?type",
+            templateUrl: "/views/company/list.html",
             data: {
                 pageTitle: 'Liste des societes'
+            },
+            controller: "SocieteController"
+        })
+        .state('societe.list_supplier', {
+            url: "/supplier?type",
+            templateUrl: "/views/company/list_supplier.html",
+            data: {
+                pageTitle: 'Liste des fournisseurs'
             },
             controller: "SocieteController"
         })
         .state('societe.show', {
             parent: "societe",
             url: "/{id:[0-9a-z]{24}}",
-            templateUrl: "/views/_company/fiche.html",
+            templateUrl: "/views/company/fiche.html",
             data: {
                 pageTitle: 'Fiche societe'
             },
             controller: "SocieteController"
         })
+        .state('societe.show.company', {
+            templateUrl: "/views/company/company.html",
+            data: {
+                pageTitle: 'Fiche societe'
+            }
+        })
+        /*.state('societe.show.person', {
+            url: "/person",
+            templateUrl: "/views/company/company.html", //TODO company > person
+            data: {
+                pageTitle: 'Fiche societe'
+            }
+        })*/
+        .state('societe.show.commercial', {
+            url: "/commercial",
+            templateUrl: "/views/company/commercial.html",
+            data: {
+                pageTitle: 'Fiche societe'
+            }
+        })
+        .state('societe.show.addresses', {
+            url: "/addresses",
+            templateUrl: "/views/company/addresses.html",
+            data: {
+                pageTitle: 'Fiche societe'
+            }
+        })
+        .state('societe.show.billing', {
+            url: "/billing",
+            templateUrl: "/views/company/billing.html",
+            data: {
+                pageTitle: 'Fiche societe'
+            }
+        })
+        .state('societe.show.task', {
+            url: "/task",
+            templateUrl: "/views/company/task.html",
+            data: {
+                pageTitle: 'Fiche societe'
+            }
+        })
+        .state('societe.show.files', {
+            url: "/files",
+            templateUrl: "/views/company/files.html",
+            data: {
+                pageTitle: 'Fiche societe'
+            }
+        })
+        .state('societe.show.feeds', {
+            url: "/feeds",
+            templateUrl: "/views/company/feeds.html",
+            data: {
+                pageTitle: 'Fiche societe'
+            }
+        })
+        .state('societe.show.stats', {
+            url: "/stats",
+            templateUrl: "/views/company/stats.html",
+            data: {
+                pageTitle: 'Fiche societe'
+            }
+        })
         .state('societe.create', {
             parent: "societe",
             url: "/create.html",
-            templateUrl: "/views/_company/create.html",
+            templateUrl: "/views/company/company.html",
             data: {
-                pageTitle: 'Creation societe'
+                pageTitle: 'Creation clients/fournisseur'
             },
             controller: "SocieteController"
         })
         .state('societe.stats', {
             parent: "societe",
             url: "/stats",
-            templateUrl: "/views/_company/stats.html",
+            templateUrl: "/views/company/stats.html",
             data: {
                 pageTitle: 'Statistiques client'
             },
@@ -822,20 +1269,19 @@ MetronicApp.config(['$stateProvider', '$urlRouterProvider', function($stateProvi
         .state('contact', {
             url: "/contact",
             abstract: true,
-            templateUrl: "/views/_contact/index.html"
+            templateUrl: "/views/contact/index.html"
         })
         .state('contact.list', {
             url: "",
-            templateUrl: "/views/_contact/list.html",
+            templateUrl: "/views/contact/list.html",
             data: {
                 pageTitle: 'Liste des contacts'
             },
             controller: "ContactController"
         })
         .state('contact.show', {
-            parent: "contact",
             url: "/{id:[0-9a-z]{24}}",
-            templateUrl: "/views/_contact/fiche.html",
+            templateUrl: "/views/contact/fiche.html",
             data: {
                 pageTitle: 'Fiche contact'
             },
@@ -844,7 +1290,7 @@ MetronicApp.config(['$stateProvider', '$urlRouterProvider', function($stateProvi
         .state('contact.create', {
             parent: "contact",
             url: "/create.html?societe",
-            templateUrl: "/views/_contact/create.html",
+            templateUrl: "/views/contact/create.html",
             data: {
                 pageTitle: 'Creation contact'
             },
@@ -854,101 +1300,254 @@ MetronicApp.config(['$stateProvider', '$urlRouterProvider', function($stateProvi
         .state('product', {
             url: "/product",
             abstract: true,
-            templateUrl: "/views/_product/index.html"
+            templateUrl: "/views/product/index.html"
         })
         .state('product.list', {
             parent: "product",
             url: "",
-            templateUrl: "/views/_product/list.html",
+            templateUrl: "/views/product/list.html",
             data: {
                 pageTitle: 'Liste des produits / services'
             },
-            controller: "ProductController"
+            controller: "ProductListController"
         })
         .state('product.show', {
-            parent: "product",
             url: "/{id:[0-9a-z]{24}}",
-            templateUrl: "/views/_product/fiche.html",
+            //abstract: true,
+            templateUrl: "/views/product/fiche.html",
             data: {
                 pageTitle: 'Fiche produit / service'
             },
             controller: "ProductController"
         })
+        .state('product.show.images', {
+            url: "/images",
+            templateUrl: "/views/product/productImages.html",
+            data: {
+                pageTitle: 'Images'
+            }
+        })
         .state('product.create', {
             parent: "product",
             url: "/create.html",
-            templateUrl: "/views/_product/create.html",
+            templateUrl: "/views/product/informations.html",
             data: {
                 pageTitle: 'Nouveau produit / service'
             },
             controller: "ProductController"
         })
-        .state('product.pricelevel', {
+        .state('product.pricelist', {
             parent: "product",
-            url: "/pricelevel.html",
-            templateUrl: "/views/_product/pricelevel.html",
+            url: "/pricelevel.html?priceListId",
+            templateUrl: "/views/product/pricelist.html",
             data: {
                 pageTitle: 'Liste de prix'
             },
-            controller: "ProductPriceLevelController"
+            controller: "ProductPriceListController"
         })
         .state('product.consumption', {
             parent: "product",
             url: "/consumption.html",
-            templateUrl: "/views/_product/consumption.html",
+            templateUrl: "/views/product/consumption.html",
             data: {
                 pageTitle: 'Statistiques de consommation des produits'
             },
             controller: "ProductStatsController"
         })
-        // Category
-        .state('category', {
-            url: "/category",
+        .state('product.images', {
+            parent: "product",
+            url: "/images.html",
+            templateUrl: "/views/product/images.html",
+            data: {
+                pageTitle: 'Banques d\'images des produits'
+            },
+            controller: "ProductBankImagesController"
+        })
+        // Attributes
+        .state('product.attributes', {
+            parent: "product",
+            url: "/attributeslist",
             abstract: true,
-            templateUrl: "/views/_category/index.html"
+            templateUrl: "/views/product/index.html"
         })
-        .state('category.list', {
-            parent: "category",
+        .state('product.attributes.list', {
             url: "",
-            templateUrl: "/views/_category/list.html",
+            templateUrl: "/views/product/attributeslist.html",
             data: {
-                pageTitle: 'Liste des categories produits / services'
+                pageTitle: 'Liste des Attributs de produits'
+            },
+            controller: "SettingProductController"
+        })
+        .state('product.attributes.create', {
+            url: "/create.html",
+            templateUrl: "/views/product/attributeslistfiche.html",
+            data: {
+                pageTitle: 'Ajouter un attribut'
+            },
+            controller: "SettingProductController"
+        })
+        .state('product.attributes.show', {
+            url: "/{id:[0-9a-z]{24}}",
+            templateUrl: "/views/product/attributeslistfiche.html",
+            data: {
+                pageTitle: 'Editer un attribut'
+            },
+            controller: "SettingProductController"
+        })
+        // Categories
+        .state('product.categories', {
+            parent: "product",
+            url: "/productcategories",
+            templateUrl: "/views/product/productcategories.html",
+            data: {
+                pageTitle: 'Configuration des categories'
             },
             controller: "CategoryController"
         })
-        .state('category.show', {
-            parent: "category",
-            url: "/{id:[0-9a-z]{24}}",
-            templateUrl: "/views/_category/fiche.html",
+        // Family configuration
+        .state('product.family', {
+            parent: "product",
+            url: "/familyproductlist",
+            abstract: true,
+            templateUrl: "/views/product/index.html"
+        })
+        .state('product.family.list', {
+            url: "",
+            templateUrl: "/views/product/familyproductlist.html",
             data: {
-                pageTitle: 'Categorie produit / service'
+                pageTitle: 'Liste des familles de produits'
+            },
+            controller: "SettingProductController"
+        })
+        .state('product.family.create', {
+            url: "/create.html",
+            templateUrl: "/views/product/familyproductlistfiche.html",
+            data: {
+                pageTitle: 'Créer une famille de produit'
+            },
+            controller: "SettingProductController"
+        })
+        .state('product.family.show', {
+            url: "/{id:[0-9a-z]{24}}",
+            templateUrl: "/views/product/familyproductlistfiche.html",
+            data: {
+                pageTitle: 'Editer une famille de produit'
+            },
+            controller: "SettingProductController"
+        })
+        // ---- //
+        .state('product.visual', {
+            parent: "product",
+            url: "/visual/{id:[0-9a-z]{24}}",
+            templateUrl: "/views/product/productvisual.html",
+            data: {
+                pageTitle: 'Fiche produit print'
+            },
+            controller: "ProductController"
+        })
+        // marketing
+        .state("product.show.marketing", {
+            url: "/marketing",
+            templateUrl: "/views/product/marketing.html",
+            data: {
+                pageTitle: 'Marketing - Product'
+            }
+        })
+        // attributes
+        .state("product.show.attributes", {
+            url: "/attributes",
+            templateUrl: "/views/product/attributes.html",
+            data: {
+                pageTitle: 'Attributes - Product'
+            }
+        })
+        // information
+        .state("product.show.informations", {
+            templateUrl: "/views/product/informations.html",
+            data: {
+                pageTitle: 'Informations - Product'
+            }
+        })
+        // price
+        .state("product.show.price", {
+            url: "/price",
+            templateUrl: "/views/product/price.html",
+            data: {
+                pageTitle: 'Prices - Product'
+            }
+        })
+        // associations
+        .state("product.show.categories", {
+            url: "/categories",
+            templateUrl: "/views/product/categories.html",
+            data: {
+                pageTitle: 'Categories - Product '
             },
             controller: "CategoryController"
+        })
+        // declinaisons
+        .state("product.show.declinations", {
+            url: "/declinations",
+            templateUrl: "/views/product/declinations.html",
+            data: {
+                pageTitle: 'Declinaisons - Product '
+            }
+        })
+        // stocks
+        .state("product.show.stock", {
+            url: "/stock",
+            templateUrl: "/templates/product/stock.html",
+            data: {
+                pageTitle: 'Stock - Product '
+            }
+        })
+        // ecommerce
+        .state("product.show.ecommerce", {
+            url: "/ecommerce",
+            templateUrl: "/views/product/ecommerce.html",
+            data: {
+                pageTitle: 'Ecommerce - Product '
+            }
+        })
+        .state("product.show.bundles", {
+            url: "/bundle",
+            templateUrl: "/views/product/bundles.html",
+            data: {
+                pageTitle: 'Compositions - Product '
+            }
+        })
+        .state("product.show.packaging", {
+            url: "/packaging",
+            templateUrl: "/views/product/packaging.html",
+            data: {
+                pageTitle: 'Conditionnement / lots'
+            }
+        })
+        // channels
+        .state("product.show.channels", {
+            url: "/channels",
+            templateUrl: "/views/product/channels.html",
+            data: {
+                pageTitle: 'Canaux - Integration'
+            }
+        })
+        .state('product.show.stats', {
+            url: "/stats",
+            templateUrl: "/views/product/stats.html",
+            data: {
+                pageTitle: 'Statistiques produits'
+            }
         })
         // Bank/Payment
         .state('bank', {
             url: "/bank",
             abstract: true,
-            templateUrl: "/views/_bank/index.html"
-        })
-        .state('payment', {
-            url: "/payment",
-            abstract: true,
-            templateUrl: "/views/_payment/index.html"
-        })
-        .state('payment.create', {
-            parent: "payment",
-            url: "?societe&entity",
-            templateUrl: "/views/_payment/create.html",
-            data: {
-                pageTitle: 'Nouveau règlement'
-            },
-            controller: "PaymentController"
+            templateUrl: "/views/bank/index.html"
         })
         .state('task', {
             url: "/task",
             abstract: true,
-            templateUrl: "/views/_task/index.html",
+            templateUrl: "/views/task/index.html",
             resolve: {
                 deps: ['$ocLazyLoad', function($ocLazyLoad) {
                     return $ocLazyLoad.load({
@@ -963,7 +1562,7 @@ MetronicApp.config(['$stateProvider', '$urlRouterProvider', function($stateProvi
         })
         .state('task.list', {
             url: "",
-            templateUrl: "/views/_task/list.html",
+            templateUrl: "/views/task/list.html",
             data: {
                 pageTitle: 'Liste des taches'
             },
@@ -971,52 +1570,52 @@ MetronicApp.config(['$stateProvider', '$urlRouterProvider', function($stateProvi
         })
         .state('task.todo', {
             url: "/todo?menuclose?group",
-            templateUrl: "/views/_task/todo.html",
+            templateUrl: "/views/task/todo.html",
             data: {
-                pageTitle: 'Liste des taches'
+                pageTitle: 'Liste des tâches'
             },
             controller: "TaskController"
         })
         .state('task.show', {
             parent: "task",
             url: "/{id:[0-9a-z]{24}}",
-            templateUrl: "/views/_task/fiche.html",
+            templateUrl: "/views/task/fiche.html",
             data: {
-                pageTitle: 'Tache'
+                pageTitle: 'Tâche'
             },
             controller: "TaskController"
         })
         .state('task.create', {
             parent: "task",
             url: "/create.html?societe",
-            templateUrl: "/views/_task/create.html",
+            templateUrl: "/views/task/fiche.html",
             data: {
-                pageTitle: 'Creation d\'une tache'
+                pageTitle: 'Création d\'une tâche'
             },
             controller: "TaskController"
         })
         .state('accounting', {
             url: "/accounting",
             abstract: true,
-            templateUrl: "/views/_accounting/index.html"
-                /*resolve: {
-                    deps: ['$ocLazyLoad', function ($ocLazyLoad) {
-                            return $ocLazyLoad.load({
-                                name: 'MetronicApp',
-                                insertBefore: '#ng_load_plugins_before', // load the above css files before a LINK element with this ID. Dynamic CSS files must be loaded between core and theme css files
-                                files: [
-                                    '/assets/global/plugins/bootstrap-daterangepicker/daterangepicker-bs3.css',
-                                    '/assets/global/plugins/bootstrap-daterangepicker/moment.min.js',
-                                    '/assets/global/plugins/bootstrap-daterangepicker/daterangepicker.js'
-                                ]
-                            });
-                        }]
-                }*/
+            templateUrl: "/views/accounting/index.html"
+            /*resolve: {
+                deps: ['$ocLazyLoad', function ($ocLazyLoad) {
+                        return $ocLazyLoad.load({
+                            name: 'MetronicApp',
+                            insertBefore: '#ng_load_plugins_before', // load the above css files before a LINK element with this ID. Dynamic CSS files must be loaded between core and theme css files
+                            files: [
+                                '/assets/global/plugins/bootstrap-daterangepicker/daterangepicker-bs3.css',
+                                '/assets/global/plugins/bootstrap-daterangepicker/moment.min.js',
+                                '/assets/global/plugins/bootstrap-daterangepicker/daterangepicker.js'
+                            ]
+                        });
+                    }]
+            }*/
         })
         .state('accounting.journal', {
             parent: "accounting",
             url: "/journal?journal&account",
-            templateUrl: "/views/_accounting/journal.html",
+            templateUrl: "/views/accounting/journal.html",
             data: {
                 pageTitle: 'Journaux'
             },
@@ -1025,7 +1624,7 @@ MetronicApp.config(['$stateProvider', '$urlRouterProvider', function($stateProvi
         .state('accounting.bank', {
             parent: "accounting",
             url: "/bank?bank",
-            templateUrl: "/views/_accounting/bank.html",
+            templateUrl: "/views/accounting/bank.html",
             data: {
                 pageTitle: 'Releves bancaires'
             },
@@ -1034,7 +1633,7 @@ MetronicApp.config(['$stateProvider', '$urlRouterProvider', function($stateProvi
         .state('accounting.estimated', {
             parent: "accounting",
             url: "/estimated",
-            templateUrl: "/views/_accounting/estimated.html",
+            templateUrl: "/views/accounting/estimated.html",
             data: {
                 pageTitle: 'Previsionnel'
             },
@@ -1043,7 +1642,7 @@ MetronicApp.config(['$stateProvider', '$urlRouterProvider', function($stateProvi
         .state('accounting.balance', {
             parent: "accounting",
             url: "/balance",
-            templateUrl: "/views/_accounting/balance.html",
+            templateUrl: "/views/accounting/balance.html",
             data: {
                 pageTitle: 'Balance comptable'
             },
@@ -1053,7 +1652,7 @@ MetronicApp.config(['$stateProvider', '$urlRouterProvider', function($stateProvi
         .state('report', {
             url: "/report",
             abstract: true,
-            templateUrl: "/views/_report/index.html"
+            templateUrl: "/views/report/index.html"
         })
         /*.state('contact.list', {
          url: "",
@@ -1066,7 +1665,7 @@ MetronicApp.config(['$stateProvider', '$urlRouterProvider', function($stateProvi
         .state('report.show', {
             parent: "report",
             url: "/{id:[0-9a-z]{24}}",
-            templateUrl: "/views/_report/fiche.html",
+            templateUrl: "/views/report/fiche.html",
             data: {
                 pageTitle: 'Fiche compte-rendu'
             },
@@ -1075,7 +1674,7 @@ MetronicApp.config(['$stateProvider', '$urlRouterProvider', function($stateProvi
         .state('report.create', {
             parent: "report",
             url: "/create.html?societe",
-            templateUrl: "/views/_report/create.html",
+            templateUrl: "/views/report/create.html",
             data: {
                 pageTitle: 'Creation compte-rendu'
             },
@@ -1085,11 +1684,11 @@ MetronicApp.config(['$stateProvider', '$urlRouterProvider', function($stateProvi
         .state('stock', {
             url: "/stock",
             abstract: true,
-            templateUrl: "/views/_stock/index.html"
+            templateUrl: "/views/stock/index.html"
         })
         .state('stock.list', {
             url: "",
-            templateUrl: "/views/_stock/list.html",
+            templateUrl: "/views/stock/list.html",
             data: {
                 pageTitle: 'Mouvements de stock'
             },
@@ -1098,7 +1697,7 @@ MetronicApp.config(['$stateProvider', '$urlRouterProvider', function($stateProvi
         .state('stock.inventory', {
             parent: "stock",
             url: "/inventory.html",
-            templateUrl: "/views/_stock/inventory.html",
+            templateUrl: "/views/stock/inventory.html",
             data: {
                 pageTitle: 'Etat des stocks'
             },
@@ -1174,6 +1773,7 @@ MetronicApp.config(['$stateProvider', '$urlRouterProvider', function($stateProvi
             },
             controller: "EEDHLController"
         })
+        //Absence
         .state('europexpress.absence', {
             parent: "europexpress",
             url: "/absence.html",
@@ -1201,6 +1801,7 @@ MetronicApp.config(['$stateProvider', '$urlRouterProvider', function($stateProvi
             },
             controller: "UserRhAbsenceController"
         })
+        //Vehicule
         .state('europexpress.vehicule', {
             parent: "europexpress",
             url: "/list_vehicule.html",
@@ -1300,11 +1901,11 @@ MetronicApp.config(['$stateProvider', '$urlRouterProvider', function($stateProvi
         .state('user', {
             url: "/user",
             abstract: true,
-            templateUrl: "/views/user/index.html"
+            templateUrl: "/views/settings/user/index.html"
         })
         .state('user.list', {
             url: "",
-            templateUrl: "/views/user/list.html",
+            templateUrl: "/views/settings/user/list.html",
             data: {
                 pageTitle: 'Liste des utilisateurs'
             },
@@ -1313,7 +1914,7 @@ MetronicApp.config(['$stateProvider', '$urlRouterProvider', function($stateProvi
         .state('user.create', {
             parent: "user",
             url: "/create.html",
-            templateUrl: "/views/user/create.html",
+            templateUrl: "/views/settings/user/fiche.html",
             data: {
                 pageTitle: 'Nouvel utilisateur'
             },
@@ -1322,21 +1923,90 @@ MetronicApp.config(['$stateProvider', '$urlRouterProvider', function($stateProvi
         .state('user.show', {
             parent: "user",
             url: "/{id}",
-            templateUrl: "/views/user/fiche.html",
+            templateUrl: "/views/settings/user/fiche.html",
             data: {
                 pageTitle: 'Fiche collaborateur'
             },
             controller: "UserController"
         })
+        // Menu employees
+        .state('employee', {
+            url: "/employee",
+            abstract: true,
+            templateUrl: "/views/employees/index.html"
+        })
+        .state('employee.list', {
+            url: "",
+            templateUrl: "/views/employees/list.html",
+            data: {
+                pageTitle: 'Liste des collaborateurs'
+            },
+            controller: "EmployeeController"
+        })
+        .state('employee.show', {
+            url: "/{id:[0-9a-z]{24}}",
+            templateUrl: "/views/employees/fiche.html",
+            data: {
+                pageTitle: 'Fiche Collaborateur'
+            },
+            controller: "EmployeeController"
+        })
+        .state('employee.create', {
+            parent: "employee",
+            url: "/create.html",
+            templateUrl: "/views/employees/main.html",
+            data: {
+                pageTitle: 'Nouveau Collaborateur'
+            },
+            controller: "EmployeeController"
+        })
+        // Main
+        .state("employee.show.main", {
+            templateUrl: "/views/employees/main.html",
+            data: {
+                pageTitle: 'Main'
+            }
+        })
+        // Files
+        .state('employee.show.files', {
+            url: "/files",
+            templateUrl: "/views/employees/files.html",
+            data: {
+                pageTitle: 'Images / Documents'
+            }
+        })
+        // Personnal Information
+        .state("employee.show.personnalinformation", {
+            url: "/PersonnalInformation",
+            templateUrl: "/views/employees/personnal.html",
+            data: {
+                pageTitle: 'PersonnalInformation'
+            }
+        }) // Job
+        .state("employee.show.job", {
+            url: "/Job",
+            templateUrl: "/views/employees/job.html",
+            data: {
+                pageTitle: 'Job'
+            }
+        })
+        // Assignees
+        .state("employee.show.assignees", {
+            url: "/assignees",
+            templateUrl: "/views/employees/assignees.html",
+            data: {
+                pageTitle: 'Affectation'
+            }
+        })
         // Group management
         .state('group', {
             url: "/group",
             abstract: true,
-            templateUrl: "/views/group/index.html"
+            templateUrl: "/views/settings/group/index.html"
         })
         .state('group.list', {
             url: "",
-            templateUrl: "/views/group/list.html",
+            templateUrl: "/views/settings/group/list.html",
             data: {
                 pageTitle: 'Liste des utilisateurs'
             },
@@ -1345,7 +2015,7 @@ MetronicApp.config(['$stateProvider', '$urlRouterProvider', function($stateProvi
         .state('group.create', {
             parent: "group",
             url: "/create.html",
-            templateUrl: "/views/group/create.html",
+            templateUrl: "/views/settings/group/create.html",
             data: {
                 pageTitle: 'Nouveau groupe'
             },
@@ -1354,19 +2024,55 @@ MetronicApp.config(['$stateProvider', '$urlRouterProvider', function($stateProvi
         .state('group.show', {
             parent: "group",
             url: "/{id}",
-            templateUrl: "/views/group/fiche.html",
+            templateUrl: "/views/settings/group/fiche.html",
             data: {
                 pageTitle: 'Fiche groupe'
             },
             controller: "GroupController"
         })
+        // Gestion des Paiements grouped
+        .state('payment', {
+            parent: "bank",
+            url: "/payment",
+            abstract: true,
+            templateUrl: "/views/bank/index.html"
+        })
+        .state('payment.chq', {
+            url: "/chq",
+            abstract: true,
+            templateUrl: "/views/bank/index.html"
+        })
+        .state('payment.chq.list', {
+            url: "?Status",
+            templateUrl: "/views/bank/listGroupChq.html",
+            data: {
+                pageTitle: 'Liste des remises de cheques'
+            },
+            controller: "PaymentGroupController"
+        })
+        .state('payment.chq.show', {
+            url: "/{id:[0-9a-z]{24}}",
+            templateUrl: "/views/bank/ficheGroupChq.html",
+            data: {
+                pageTitle: 'Remise de cheque'
+            },
+            controller: "PaymentGroupController"
+        })
+        .state('payment.chq.create', {
+            url: "/create.html",
+            templateUrl: "/views/bank/createGroupChq.html",
+            data: {
+                pageTitle: 'Nouvelle remise de cheque'
+            },
+            controller: "PaymentGroupController"
+        })
         // Gestion des LCR
-        .state('lcr', {
+        .state('payment.lcr', {
             url: "/lcr",
             abstract: true,
             templateUrl: "/views/_lcr/index.html"
         })
-        .state('lcr.list', {
+        .state('payment.lcr.list', {
             url: "?Status",
             templateUrl: "/views/_lcr/list.html",
             data: {
@@ -1374,8 +2080,7 @@ MetronicApp.config(['$stateProvider', '$urlRouterProvider', function($stateProvi
             },
             controller: "LcrController"
         })
-        .state('lcr.show', {
-            parent: "lcr",
+        .state('payment.lcr.show', {
             url: "/{id:[0-9a-z]{24}}",
             templateUrl: "/views/_lcr/fiche.html",
             data: {
@@ -1383,8 +2088,7 @@ MetronicApp.config(['$stateProvider', '$urlRouterProvider', function($stateProvi
             },
             controller: "LcrController"
         })
-        .state('lcr.create', {
-            parent: "lcr",
+        .state('payment.lcr.create', {
             url: "/create.html",
             templateUrl: "/views/_lcr/create.html",
             data: {
@@ -1392,314 +2096,477 @@ MetronicApp.config(['$stateProvider', '$urlRouterProvider', function($stateProvi
             },
             controller: "LcrController"
         })
-        /*
-         // AngularJS plugins
-         .state('fileupload', {
-         url: "/file_upload.html",
-         templateUrl: "/views/file_upload.html",
-         data: {pageTitle: 'AngularJS File Upload', pageSubTitle: 'angularjs file upload'},
-         controller: "GeneralPageController",
-         resolve: {
-         deps: ['$ocLazyLoad', function ($ocLazyLoad) {
-         return $ocLazyLoad.load([{
-         name: 'angularFileUpload',
-         files: [
-         '/assets/global/plugins/angularjs/plugins/angular-file-upload/angular-file-upload.min.js'
-         ]
-         }, {
-         name: 'MetronicApp',
-         files: [
-         '/controllers/GeneralPageController.js'
-         ]
-         }]);
-         }]
-         }
-         })
-         
-         // UI Select
-         .state('uiselect', {
-         url: "/ui_select.html",
-         templateUrl: "/views/ui_select.html",
-         data: {pageTitle: 'AngularJS Ui Select', pageSubTitle: 'select2 written in angularjs'},
-         controller: "UISelectController",
-         resolve: {
-         deps: ['$ocLazyLoad', function ($ocLazyLoad) {
-         return $ocLazyLoad.load([{
-         name: 'ui.select',
-         insertBefore: '#ng_load_plugins_before', // load the above css files before '#ng_load_plugins_before'
-         files: [
-         '/assets/global/plugins/angularjs/plugins/ui-select/select.min.css',
-         '/assets/global/plugins/angularjs/plugins/ui-select/select.min.js'
-         ]
-         }, {
-         name: 'MetronicApp',
-         files: [
-         '/controllers/UISelectController.js'
-         ]
-         }]);
-         }]
-         }
-         })
-         
-         // UI Bootstrap
-         .state('uibootstrap', {
-         url: "/ui_bootstrap.html",
-         templateUrl: "/views/ui_bootstrap.html",
-         data: {pageTitle: 'AngularJS UI Bootstrap', pageSubTitle: 'bootstrap components written in angularjs'},
-         controller: "GeneralPageController",
-         resolve: {
-         deps: ['$ocLazyLoad', function ($ocLazyLoad) {
-         return $ocLazyLoad.load([{
-         name: 'MetronicApp',
-         files: [
-         '/controllers/GeneralPageController.js'
-         ]
-         }]);
-         }]
-         }
-         })
-         
-         // Tree View
-         .state('tree', {
-         url: "/tree",
-         templateUrl: "/views/tree.html",
-         data: {pageTitle: 'jQuery Tree View', pageSubTitle: 'tree view samples'},
-         controller: "GeneralPageController",
-         resolve: {
-         deps: ['$ocLazyLoad', function ($ocLazyLoad) {
-         return $ocLazyLoad.load([{
-         name: 'MetronicApp',
-         insertBefore: '#ng_load_plugins_before', // load the above css files before '#ng_load_plugins_before'
-         files: [
-         '/assets/global/plugins/jstree/dist/themes/default/style.min.css',
-         '/assets/global/plugins/jstree/dist/jstree.min.js',
-         '/assets/admin/pages/scripts/ui-tree.js',
-         '/controllers/GeneralPageController.js'
-         ]
-         }]);
-         }]
-         }
-         })
-         
-         // Form Tools
-         .state('formtools', {
-         url: "/form-tools",
-         templateUrl: "/views/form_tools.html",
-         data: {pageTitle: 'Form Tools', pageSubTitle: 'form components & widgets sample'},
-         controller: "GeneralPageController",
-         resolve: {
-         deps: ['$ocLazyLoad', function ($ocLazyLoad) {
-         return $ocLazyLoad.load([{
-         name: 'MetronicApp',
-         insertBefore: '#ng_load_plugins_before', // load the above css files before '#ng_load_plugins_before'
-         files: [
-         '/assets/global/plugins/bootstrap-fileinput/bootstrap-fileinput.css',
-         '/assets/global/plugins/bootstrap-switch/css/bootstrap-switch.min.css',
-         '/assets/global/plugins/jquery-tags-input/jquery.tagsinput.css',
-         '/assets/global/plugins/bootstrap-markdown/css/bootstrap-markdown.min.css',
-         '/assets/global/plugins/typeahead/typeahead.css',
-         '/assets/global/plugins/fuelux/js/spinner.min.js',
-         '/assets/global/plugins/bootstrap-fileinput/bootstrap-fileinput.js',
-         '/assets/global/plugins/jquery-inputmask/jquery.inputmask.bundle.min.js',
-         '/assets/global/plugins/jquery.input-ip-address-control-1.0.min.js',
-         '/assets/global/plugins/bootstrap-pwstrength/pwstrength-bootstrap.min.js',
-         '/assets/global/plugins/bootstrap-switch/js/bootstrap-switch.min.js',
-         '/assets/global/plugins/jquery-tags-input/jquery.tagsinput.min.js',
-         '/assets/global/plugins/bootstrap-maxlength/bootstrap-maxlength.min.js',
-         '/assets/global/plugins/bootstrap-touchspin/bootstrap.touchspin.js',
-         '/assets/global/plugins/typeahead/handlebars.min.js',
-         '/assets/global/plugins/typeahead/typeahead.bundle.min.js',
-         '/assets/admin/pages/scripts/components-form-tools.js',
-         '/controllers/GeneralPageController.js'
-         ]
-         }]);
-         }]
-         }
-         })
-         
-         // Date & Time Pickers
-         .state('pickers', {
-         url: "/pickers",
-         templateUrl: "/views/pickers.html",
-         data: {pageTitle: 'Date & Time Pickers', pageSubTitle: 'date, time, color, daterange pickers'},
-         controller: "GeneralPageController",
-         resolve: {
-         deps: ['$ocLazyLoad', function ($ocLazyLoad) {
-         return $ocLazyLoad.load([{
-         name: 'MetronicApp',
-         insertBefore: '#ng_load_plugins_before', // load the above css files before '#ng_load_plugins_before'
-         files: [
-         '/assets/global/plugins/clockface/css/clockface.css',
-         '/assets/global/plugins/bootstrap-datepicker/css/datepicker3.css',
-         '/assets/global/plugins/bootstrap-timepicker/css/bootstrap-timepicker.min.css',
-         '/assets/global/plugins/bootstrap-colorpicker/css/colorpicker.css',
-         '/assets/global/plugins/bootstrap-daterangepicker/daterangepicker-bs3.css',
-         '/assets/global/plugins/bootstrap-datetimepicker/css/bootstrap-datetimepicker.min.css',
-         '/assets/global/plugins/bootstrap-datepicker/js/bootstrap-datepicker.js',
-         '/assets/global/plugins/bootstrap-timepicker/js/bootstrap-timepicker.min.js',
-         '/assets/global/plugins/clockface/js/clockface.js',
-         '/assets/global/plugins/bootstrap-daterangepicker/moment.min.js',
-         '/assets/global/plugins/bootstrap-daterangepicker/daterangepicker.js',
-         '/assets/global/plugins/bootstrap-colorpicker/js/bootstrap-colorpicker.js',
-         '/assets/global/plugins/bootstrap-datetimepicker/js/bootstrap-datetimepicker.min.js',
-         '/assets/admin/pages/scripts/components-pickers.js',
-         '/controllers/GeneralPageController.js'
-         ]
-         }]);
-         }]
-         }
-         })
-         
-         // Custom Dropdowns
-         .state('dropdowns', {
-         url: "/dropdowns",
-         templateUrl: "/views/dropdowns.html",
-         data: {pageTitle: 'Custom Dropdowns', pageSubTitle: 'select2 & bootstrap select dropdowns'},
-         controller: "GeneralPageController",
-         resolve: {
-         deps: ['$ocLazyLoad', function ($ocLazyLoad) {
-         return $ocLazyLoad.load([{
-         name: 'MetronicApp',
-         insertBefore: '#ng_load_plugins_before', // load the above css files before '#ng_load_plugins_before'
-         files: [
-         '/assets/global/plugins/bootstrap-select/bootstrap-select.min.css',
-         '/assets/global/plugins/select2/select2.css',
-         '/assets/global/plugins/jquery-multi-select/css/multi-select.css',
-         '/assets/global/plugins/bootstrap-select/bootstrap-select.min.js',
-         '/assets/global/plugins/select2/select2.min.js',
-         '/assets/global/plugins/jquery-multi-select/js/jquery.multi-select.js',
-         '/assets/admin/pages/scripts/components-dropdowns.js',
-         '/controllers/GeneralPageController.js'
-         ]
-         }]);
-         }]
-         }
-         })
-         
-         // Advanced Datatables
-         .state('datatablesAdvanced', {
-         url: "/datatables/advanced.html",
-         templateUrl: "/views/datatables/advanced.html",
-         data: {pageTitle: 'Advanced Datatables', pageSubTitle: 'advanced datatables samples'},
-         controller: "GeneralPageController",
-         resolve: {
-         deps: ['$ocLazyLoad', function ($ocLazyLoad) {
-         return $ocLazyLoad.load({
-         name: 'MetronicApp',
-         insertBefore: '#ng_load_plugins_before', // load the above css files before '#ng_load_plugins_before'
-         files: [
-         '/assets/global/plugins/select2/select2.css',
-         '/assets/global/plugins/datatables/plugins/bootstrap/dataTables.bootstrap.css',
-         '/assets/global/plugins/datatables/extensions/Scroller/css/dataTables.scroller.min.css',
-         '/assets/global/plugins/datatables/extensions/ColReorder/css/dataTables.colReorder.min.css',
-         '/assets/global/plugins/select2/select2.min.js',
-         '/assets/global/plugins/datatables/all.min.js',
-         '/scripts/table-advanced.js',
-         '/controllers/GeneralPageController.js'
-         ]
-         });
-         }]
-         }
-         })
-         
-         // Ajax Datetables
-         .state('datatablesAjax', {
-         url: "/datatables/ajax.html",
-         templateUrl: "/views/datatables/ajax.html",
-         data: {pageTitle: 'Ajax Datatables', pageSubTitle: 'ajax datatables samples'},
-         controller: "GeneralPageController",
-         resolve: {
-         deps: ['$ocLazyLoad', function ($ocLazyLoad) {
-         return $ocLazyLoad.load({
-         name: 'MetronicApp',
-         insertBefore: '#ng_load_plugins_before', // load the above css files before '#ng_load_plugins_before'
-         files: [
-         '/assets/global/plugins/select2/select2.css',
-         '/assets/global/plugins/bootstrap-datepicker/css/datepicker.css',
-         '/assets/global/plugins/datatables/plugins/bootstrap/dataTables.bootstrap.css',
-         '/assets/global/plugins/bootstrap-datepicker/js/bootstrap-datepicker.js',
-         '/assets/global/plugins/select2/select2.min.js',
-         '/assets/global/plugins/datatables/all.min.js',
-         '/assets/global/scripts/datatable.js',
-         '/scripts/table-ajax.js',
-         '/controllers/GeneralPageController.js'
-         ]
-         });
-         }]
-         }
-         })
-         
-         // User Profile
-         .state("profile", {
-         url: "/profile",
-         templateUrl: "/views/profile/main.html",
-         data: {pageTitle: 'User Profile', pageSubTitle: 'user profile sample'},
-         controller: "UserProfileController",
-         resolve: {
-         deps: ['$ocLazyLoad', function ($ocLazyLoad) {
-         return $ocLazyLoad.load({
-         name: 'MetronicApp',
-         insertBefore: '#ng_load_plugins_before', // load the above css files before '#ng_load_plugins_before'
-         files: [
-         '/assets/global/plugins/bootstrap-fileinput/bootstrap-fileinput.css',
-         '/assets/admin/pages/css/profile.css',
-         '/assets/admin/pages/css/tasks.css',
-         '/assets/global/plugins/jquery.sparkline.min.js',
-         '/assets/global/plugins/bootstrap-fileinput/bootstrap-fileinput.js',
-         '/assets/admin/pages/scripts/profile.js',
-         '/controllers/UserProfileController.js'
-         ]
-         });
-         }]
-         }
-         })
-         
-         // User Profile Dashboard
-         .state("profile.dashboard", {
-         url: "/dashboard",
-         templateUrl: "views/profile/dashboard.html",
-         data: {pageTitle: 'User Profile'}
-         })
-         
-         // User Profile Account
-         .state("profile.account", {
-         url: "/account",
-         templateUrl: "views/profile/account.html",
-         data: {pageTitle: 'User Account'}
-         })
-         
-         // User Profile Help
-         .state("profile.help", {
-         url: "/help",
-         templateUrl: "views/profile/help.html",
-         data: {pageTitle: 'User Help'}      
-         })
-         
-         // Todo
-         .state('todo', {
-         url: "/todo",
-         templateUrl: "views/todo.html",
-         data: {pageTitle: 'Todo'},
-         controller: "TodoController",
-         resolve: {
-         deps: ['$ocLazyLoad', function ($ocLazyLoad) {
-         return $ocLazyLoad.load({
-         name: 'MetronicApp',
-         insertBefore: '#ng_load_plugins_before', // load the above css files before '#ng_load_plugins_before'
-         files: [
-         '/assets/global/plugins/bootstrap-datepicker/css/datepicker3.css',
-         '/assets/global/plugins/select2/select2.css',
-         '/assets/admin/pages/css/todo.css',
-         '/assets/global/plugins/bootstrap-datepicker/js/bootstrap-datepicker.js',
-         '/assets/global/plugins/select2/select2.min.js',
-         '/assets/admin/pages/scripts/todo.js',
-         '/controllers/TodoController.js'
-         ]
-         });
-         }]
-         }
-         
-         })*/
+        // General settings
+        .state('settings', {
+            url: "/settings",
+            abstract: true,
+            templateUrl: "/views/settings/index.html"
+        })
+        //General Configuration
+        .state('settings.general', {
+            url: "/general",
+            templateUrl: "/views/settings/general.html",
+            data: {
+                pageTitle: 'Configuration general'
+            },
+            controller: "SettingGeneralController"
+        })
+        //Entites Configuration
+        .state('settings.entity', {
+            url: "/entity",
+            abstract: true,
+            templateUrl: "/views/settings/entities/index.html"
+        })
+        .state('settings.entity.list', {
+            url: "",
+            templateUrl: "/views/settings/entities/list.html",
+            data: {
+                pageTitle: 'Configuration des organisations'
+            },
+            controller: "SettingEntityController"
+        })
+        .state('settings.entity.create', {
+            url: "/create.html",
+            templateUrl: "/views/settings/entities/fiche.html",
+            data: {
+                pageTitle: 'Creation d\'une organisation'
+            },
+            controller: "SettingEntityController"
+        })
+        .state('settings.entity.show', {
+            url: "/{id}",
+            templateUrl: "/views/settings/entities/fiche.html",
+            data: {
+                pageTitle: 'Configuration de l\'organisation'
+            },
+            controller: "SettingEntityController"
+        })
+        //Product Configuration
+        .state('settings.product', {
+            url: "/product",
+            templateUrl: "/views/settings/product.html",
+            data: {
+                pageTitle: 'Configuration des produits'
+            }
+        })
+        // warehouse
+        .state('settings.product.warehouse', {
+            url: "/warehouse",
+            templateUrl: "/views/settings/warehouse/list.html",
+            data: {
+                pageTitle: 'Configuration des entrepots'
+            },
+            controller: "SettingProductController"
+        })
+        .state('settings.product.warehouse.create', {
+            url: "/create.html",
+            templateUrl: "/views/settings/warehouse/fiche.html",
+            data: {
+                pageTitle: 'Ajouter un entrepot'
+            },
+            controller: "SettingProductController"
+        })
+        .state('settings.product.warehouse.show', {
+            url: "/{id:[0-9a-z]{24}}",
+            templateUrl: "/views/settings/warehouse/fiche.html",
+            data: {
+                pageTitle: 'Editer un entrepot'
+            },
+            controller: "SettingProductController"
+        })
+        // prices configuration
+        .state('settings.product.pricelists', {
+            url: "/pricelists",
+            templateUrl: "/views/settings/pricelists/list.html",
+            data: {
+                pageTitle: 'Configuration des listes de prix'
+            },
+            controller: "SettingProductController"
+        })
+        .state('settings.product.pricelists.create', {
+            url: "/create.html",
+            templateUrl: "/views/settings/pricelists/fiche.html",
+            data: {
+                pageTitle: 'Ajouter une liste de prix'
+            },
+            controller: "SettingProductController"
+        })
+        .state('settings.product.pricelists.show', {
+            url: "/{id:[0-9a-z]{24}}",
+            templateUrl: "/views/settings/pricelists/fiche.html",
+            data: {
+                pageTitle: 'Editer une liste de prix'
+            },
+            controller: "SettingProductController"
+        })
+        // product types configuration
+        .state('settings.product.types', {
+            url: "/types",
+            templateUrl: "/views/settings/productTypes/list.html",
+            data: {
+                pageTitle: 'Configuration des types de produits'
+            },
+            controller: "SettingProductController"
+        })
+        .state('settings.product.types.create', {
+            url: "/create.html",
+            templateUrl: "/views/settings/productTypes/fiche.html",
+            data: {
+                pageTitle: 'Ajouter un type de produit'
+            },
+            controller: "SettingProductController"
+        })
+        .state('settings.product.types.show', {
+            url: "/{id:[0-9a-z]{24}}",
+            templateUrl: "/views/settings/productTypes/fiche.html",
+            data: {
+                pageTitle: 'Editer un type de produit'
+            },
+            controller: "SettingProductController"
+        })
+        // shipping configuration
+        .state('settings.product.shipping', {
+            url: "/shipping",
+            templateUrl: "/views/settings/shipping/list.html",
+            data: {
+                pageTitle: 'Configuration des transports'
+            },
+            controller: "SettingProductController"
+        })
+        .state('settings.product.shipping.create', {
+            url: "/create.html",
+            templateUrl: "/views/settings/shipping/create.html",
+            data: {
+                pageTitle: 'Ajouter un transport'
+            },
+            controller: "SettingProductController"
+        })
+        .state('settings.product.shipping.show', {
+            url: "/{id:[0-9a-z]{24}}",
+            templateUrl: "/views/settings/shipping/fiche.html",
+            data: {
+                pageTitle: 'Editer un tranport'
+            },
+            controller: "SettingProductController"
+        })
+        //Integration Configuration
+        .state('settings.integration', {
+            parent: "settings",
+            url: "/integration",
+            templateUrl: "/views/settings/integration.html",
+            data: {
+                pageTitle: 'Gestion des integrations'
+            },
+            controller: "SettingIntegrationController"
+        })
+    /*
+     // AngularJS plugins
+     .state('fileupload', {
+     url: "/file_upload.html",
+     templateUrl: "/views/file_upload.html",
+     data: {pageTitle: 'AngularJS File Upload', pageSubTitle: 'angularjs file upload'},
+     controller: "GeneralPageController",
+     resolve: {
+     deps: ['$ocLazyLoad', function ($ocLazyLoad) {
+     return $ocLazyLoad.load([{
+     name: 'angularFileUpload',
+     files: [
+     '/assets/global/plugins/angularjs/plugins/angular-file-upload/angular-file-upload.min.js'
+     ]
+     }, {
+     name: 'MetronicApp',
+     files: [
+     '/controllers/GeneralPageController.js'
+     ]
+     }]);
+     }]
+     }
+     })
+     
+     // UI Select
+     .state('uiselect', {
+     url: "/ui_select.html",
+     templateUrl: "/views/ui_select.html",
+     data: {pageTitle: 'AngularJS Ui Select', pageSubTitle: 'select2 written in angularjs'},
+     controller: "UISelectController",
+     resolve: {
+     deps: ['$ocLazyLoad', function ($ocLazyLoad) {
+     return $ocLazyLoad.load([{
+     name: 'ui.select',
+     insertBefore: '#ng_load_plugins_before', // load the above css files before '#ng_load_plugins_before'
+     files: [
+     '/assets/global/plugins/angularjs/plugins/ui-select/select.min.css',
+     '/assets/global/plugins/angularjs/plugins/ui-select/select.min.js'
+     ]
+     }, {
+     name: 'MetronicApp',
+     files: [
+     '/controllers/UISelectController.js'
+     ]
+     }]);
+     }]
+     }
+     })
+     
+     // UI Bootstrap
+     .state('uibootstrap', {
+     url: "/ui_bootstrap.html",
+     templateUrl: "/views/ui_bootstrap.html",
+     data: {pageTitle: 'AngularJS UI Bootstrap', pageSubTitle: 'bootstrap components written in angularjs'},
+     controller: "GeneralPageController",
+     resolve: {
+     deps: ['$ocLazyLoad', function ($ocLazyLoad) {
+     return $ocLazyLoad.load([{
+     name: 'MetronicApp',
+     files: [
+     '/controllers/GeneralPageController.js'
+     ]
+     }]);
+     }]
+     }
+     })
+     
+     // Tree View
+     .state('tree', {
+     url: "/tree",
+     templateUrl: "/views/tree.html",
+     data: {pageTitle: 'jQuery Tree View', pageSubTitle: 'tree view samples'},
+     controller: "GeneralPageController",
+     resolve: {
+     deps: ['$ocLazyLoad', function ($ocLazyLoad) {
+     return $ocLazyLoad.load([{
+     name: 'MetronicApp',
+     insertBefore: '#ng_load_plugins_before', // load the above css files before '#ng_load_plugins_before'
+     files: [
+     '/assets/global/plugins/jstree/dist/themes/default/style.min.css',
+     '/assets/global/plugins/jstree/dist/jstree.min.js',
+     '/assets/admin/pages/scripts/ui-tree.js',
+     '/controllers/GeneralPageController.js'
+     ]
+     }]);
+     }]
+     }
+     })
+     
+     // Form Tools
+     .state('formtools', {
+     url: "/form-tools",
+     templateUrl: "/views/form_tools.html",
+     data: {pageTitle: 'Form Tools', pageSubTitle: 'form components & widgets sample'},
+     controller: "GeneralPageController",
+     resolve: {
+     deps: ['$ocLazyLoad', function ($ocLazyLoad) {
+     return $ocLazyLoad.load([{
+     name: 'MetronicApp',
+     insertBefore: '#ng_load_plugins_before', // load the above css files before '#ng_load_plugins_before'
+     files: [
+     '/assets/global/plugins/bootstrap-fileinput/bootstrap-fileinput.css',
+     '/assets/global/plugins/bootstrap-switch/css/bootstrap-switch.min.css',
+     '/assets/global/plugins/jquery-tags-input/jquery.tagsinput.css',
+     '/assets/global/plugins/bootstrap-markdown/css/bootstrap-markdown.min.css',
+     '/assets/global/plugins/typeahead/typeahead.css',
+     '/assets/global/plugins/fuelux/js/spinner.min.js',
+     '/assets/global/plugins/bootstrap-fileinput/bootstrap-fileinput.js',
+     '/assets/global/plugins/jquery-inputmask/jquery.inputmask.bundle.min.js',
+     '/assets/global/plugins/jquery.input-ip-address-control-1.0.min.js',
+     '/assets/global/plugins/bootstrap-pwstrength/pwstrength-bootstrap.min.js',
+     '/assets/global/plugins/bootstrap-switch/js/bootstrap-switch.min.js',
+     '/assets/global/plugins/jquery-tags-input/jquery.tagsinput.min.js',
+     '/assets/global/plugins/bootstrap-maxlength/bootstrap-maxlength.min.js',
+     '/assets/global/plugins/bootstrap-touchspin/bootstrap.touchspin.js',
+     '/assets/global/plugins/typeahead/handlebars.min.js',
+     '/assets/global/plugins/typeahead/typeahead.bundle.min.js',
+     '/assets/admin/pages/scripts/components-form-tools.js',
+     '/controllers/GeneralPageController.js'
+     ]
+     }]);
+     }]
+     }
+     })
+     
+     // Date & Time Pickers
+     .state('pickers', {
+     url: "/pickers",
+     templateUrl: "/views/pickers.html",
+     data: {pageTitle: 'Date & Time Pickers', pageSubTitle: 'date, time, color, daterange pickers'},
+     controller: "GeneralPageController",
+     resolve: {
+     deps: ['$ocLazyLoad', function ($ocLazyLoad) {
+     return $ocLazyLoad.load([{
+     name: 'MetronicApp',
+     insertBefore: '#ng_load_plugins_before', // load the above css files before '#ng_load_plugins_before'
+     files: [
+     '/assets/global/plugins/clockface/css/clockface.css',
+     '/assets/global/plugins/bootstrap-datepicker/css/datepicker3.css',
+     '/assets/global/plugins/bootstrap-timepicker/css/bootstrap-timepicker.min.css',
+     '/assets/global/plugins/bootstrap-colorpicker/css/colorpicker.css',
+     '/assets/global/plugins/bootstrap-daterangepicker/daterangepicker-bs3.css',
+     '/assets/global/plugins/bootstrap-datetimepicker/css/bootstrap-datetimepicker.min.css',
+     '/assets/global/plugins/bootstrap-datepicker/js/bootstrap-datepicker.js',
+     '/assets/global/plugins/bootstrap-timepicker/js/bootstrap-timepicker.min.js',
+     '/assets/global/plugins/clockface/js/clockface.js',
+     '/assets/global/plugins/bootstrap-daterangepicker/moment.min.js',
+     '/assets/global/plugins/bootstrap-daterangepicker/daterangepicker.js',
+     '/assets/global/plugins/bootstrap-colorpicker/js/bootstrap-colorpicker.js',
+     '/assets/global/plugins/bootstrap-datetimepicker/js/bootstrap-datetimepicker.min.js',
+     '/assets/admin/pages/scripts/components-pickers.js',
+     '/controllers/GeneralPageController.js'
+     ]
+     }]);
+     }]
+     }
+     })
+     
+     // Custom Dropdowns
+     .state('dropdowns', {
+     url: "/dropdowns",
+     templateUrl: "/views/dropdowns.html",
+     data: {pageTitle: 'Custom Dropdowns', pageSubTitle: 'select2 & bootstrap select dropdowns'},
+     controller: "GeneralPageController",
+     resolve: {
+     deps: ['$ocLazyLoad', function ($ocLazyLoad) {
+     return $ocLazyLoad.load([{
+     name: 'MetronicApp',
+     insertBefore: '#ng_load_plugins_before', // load the above css files before '#ng_load_plugins_before'
+     files: [
+     '/assets/global/plugins/bootstrap-select/bootstrap-select.min.css',
+     '/assets/global/plugins/select2/select2.css',
+     '/assets/global/plugins/jquery-multi-select/css/multi-select.css',
+     '/assets/global/plugins/bootstrap-select/bootstrap-select.min.js',
+     '/assets/global/plugins/select2/select2.min.js',
+     '/assets/global/plugins/jquery-multi-select/js/jquery.multi-select.js',
+     '/assets/admin/pages/scripts/components-dropdowns.js',
+     '/controllers/GeneralPageController.js'
+     ]
+     }]);
+     }]
+     }
+     })
+     
+     // Advanced Datatables
+     .state('datatablesAdvanced', {
+     url: "/datatables/advanced.html",
+     templateUrl: "/views/datatables/advanced.html",
+     data: {pageTitle: 'Advanced Datatables', pageSubTitle: 'advanced datatables samples'},
+     controller: "GeneralPageController",
+     resolve: {
+     deps: ['$ocLazyLoad', function ($ocLazyLoad) {
+     return $ocLazyLoad.load({
+     name: 'MetronicApp',
+     insertBefore: '#ng_load_plugins_before', // load the above css files before '#ng_load_plugins_before'
+     files: [
+     '/assets/global/plugins/select2/select2.css',
+     '/assets/global/plugins/datatables/plugins/bootstrap/dataTables.bootstrap.css',
+     '/assets/global/plugins/datatables/extensions/Scroller/css/dataTables.scroller.min.css',
+     '/assets/global/plugins/datatables/extensions/ColReorder/css/dataTables.colReorder.min.css',
+     '/assets/global/plugins/select2/select2.min.js',
+     '/assets/global/plugins/datatables/all.min.js',
+     '/scripts/table-advanced.js',
+     '/controllers/GeneralPageController.js'
+     ]
+     });
+     }]
+     }
+     })
+     
+     // Ajax Datetables
+     .state('datatablesAjax', {
+     url: "/datatables/ajax.html",
+     templateUrl: "/views/datatables/ajax.html",
+     data: {pageTitle: 'Ajax Datatables', pageSubTitle: 'ajax datatables samples'},
+     controller: "GeneralPageController",
+     resolve: {
+     deps: ['$ocLazyLoad', function ($ocLazyLoad) {
+     return $ocLazyLoad.load({
+     name: 'MetronicApp',
+     insertBefore: '#ng_load_plugins_before', // load the above css files before '#ng_load_plugins_before'
+     files: [
+     '/assets/global/plugins/select2/select2.css',
+     '/assets/global/plugins/bootstrap-datepicker/css/datepicker.css',
+     '/assets/global/plugins/datatables/plugins/bootstrap/dataTables.bootstrap.css',
+     '/assets/global/plugins/bootstrap-datepicker/js/bootstrap-datepicker.js',
+     '/assets/global/plugins/select2/select2.min.js',
+     '/assets/global/plugins/datatables/all.min.js',
+     '/assets/global/scripts/datatable.js',
+     '/scripts/table-ajax.js',
+     '/controllers/GeneralPageController.js'
+     ]
+     });
+     }]
+     }
+     })
+     
+     // User Profile
+     .state("profile", {
+     url: "/profile",
+     templateUrl: "/views/profile/main.html",
+     data: {pageTitle: 'User Profile', pageSubTitle: 'user profile sample'},
+     controller: "UserProfileController",
+     resolve: {
+     deps: ['$ocLazyLoad', function ($ocLazyLoad) {
+     return $ocLazyLoad.load({
+     name: 'MetronicApp',
+     insertBefore: '#ng_load_plugins_before', // load the above css files before '#ng_load_plugins_before'
+     files: [
+     '/assets/global/plugins/bootstrap-fileinput/bootstrap-fileinput.css',
+     '/assets/admin/pages/css/profile.css',
+     '/assets/admin/pages/css/tasks.css',
+     '/assets/global/plugins/jquery.sparkline.min.js',
+     '/assets/global/plugins/bootstrap-fileinput/bootstrap-fileinput.js',
+     '/assets/admin/pages/scripts/profile.js',
+     '/controllers/UserProfileController.js'
+     ]
+     });
+     }]
+     }
+     })
+     
+     // User Profile Dashboard
+     .state("profile.dashboard", {
+     url: "/dashboard",
+     templateUrl: "views/profile/dashboard.html",
+     data: {pageTitle: 'User Profile'}
+     })
+     
+     // User Profile Account
+     .state("profile.account", {
+     url: "/account",
+     templateUrl: "views/profile/account.html",
+     data: {pageTitle: 'User Account'}
+     })
+     
+     // User Profile Help
+     .state("profile.help", {
+     url: "/help",
+     templateUrl: "views/profile/help.html",
+     data: {pageTitle: 'User Help'}      
+     })
+     
+     // Todo
+     .state('todo', {
+     url: "/todo",
+     templateUrl: "views/todo.html",
+     data: {pageTitle: 'Todo'},
+     controller: "TodoController",
+     resolve: {
+     deps: ['$ocLazyLoad', function ($ocLazyLoad) {
+     return $ocLazyLoad.load({
+     name: 'MetronicApp',
+     insertBefore: '#ng_load_plugins_before', // load the above css files before '#ng_load_plugins_before'
+     files: [
+     '/assets/global/plugins/bootstrap-datepicker/css/datepicker3.css',
+     '/assets/global/plugins/select2/select2.css',
+     '/assets/admin/pages/css/todo.css',
+     '/assets/global/plugins/bootstrap-datepicker/js/bootstrap-datepicker.js',
+     '/assets/global/plugins/select2/select2.min.js',
+     '/assets/admin/pages/scripts/todo.js',
+     '/controllers/TodoController.js'
+     ]
+     });
+     }]
+     }
+     
+     })*/
     ;
 }]);
 /* Init global settings and run the app */
@@ -1751,8 +2618,8 @@ MetronicApp.config(['dialogsProvider', '$translateProvider',
             DIALOGS_PLEASE_WAIT_ELIPS: "Veuillez patienter...",
             DIALOGS_PLEASE_WAIT_MSG: "Veuiller attendre la fin de l'opération.",
             DIALOGS_PERCENT_COMPLETE: "% complete",
-            DIALOGS_NOTIFICATION: "Notificacion",
-            DIALOGS_NOTIFICATION_MSG: "Notificacion inconnue.",
+            DIALOGS_NOTIFICATION: "Notification",
+            DIALOGS_NOTIFICATION_MSG: "Notification inconnue.",
             DIALOGS_CONFIRMATION: "Confirmation",
             DIALOGS_CONFIRMATION_MSG: "Confirmation requise.",
             DIALOGS_OK: "Ok",

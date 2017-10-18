@@ -1,3 +1,26 @@
+/**
+Copyright 2017 ToManage
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+@author    ToManage SAS <contact@tomanage.fr>
+@copyright 2014-2017 ToManage SAS
+@license   http://www.apache.org/licenses/LICENSE-2.0 Apache License, Version 2.0
+International Registered Trademark & Property of ToManage SAS
+*/
+
+
+
 "use strict";
 var mongoose = require('mongoose'),
     fs = require("fs"),
@@ -15,8 +38,8 @@ var mongoose = require('mongoose'),
 var Dict = require('./dict');
 
 var latex = {
-    models: framework.path.root() + "/latex/",
-    includes: framework.path.root() + "/latex/texpackages/"
+    models: F.path.root() + "/latex/",
+    includes: F.path.root() + "/latex/texpackages/"
 };
 
 /**
@@ -169,7 +192,7 @@ Template.prototype.applyHandlers = function() {
                 break;
             case "number":
                 // null value -> not 0
-                if (handler.value === null) {
+                if (!handler.value) {
                     value = "";
                     break;
                 }
@@ -190,6 +213,10 @@ Template.prototype.applyHandlers = function() {
                     });
                 break;
             case "euro":
+                if (!handler.value) {
+                    value = "";
+                    break;
+                }
                 value = accounting.formatMoney(handler.value, {
                     symbol: "€",
                     format: "%v %s",
@@ -221,7 +248,10 @@ Template.prototype.applyHandlers = function() {
                 if (!handler.value)
                     handler.value = 0;
 
-                value = fixedWidthString(handler.value, 13, { padding: '0', align: 'right' });
+                value = fixedWidthString(handler.value, 13, {
+                    padding: '0',
+                    align: 'right'
+                });
                 break;
             default:
                 return callback("Handler not found : " + handler.type + " (" + handler.id + ")");
@@ -320,52 +350,54 @@ Template.prototype.applyHeadFoot = function() {
     var entity = this.entity;
     var cgv = this.options.cgv;
     var emit = this.emit.bind(this);
+    var EntityModel = MODEL('entity').Schema;
     return function(tex, done) {
         Dict.dict({
             dictName: "fk_forme_juridique",
             object: true
         }, function(err, dict) {
 
-            mongoose.connection.db.collection('Mysoc', function(err, collection) {
-                collection.findOne({
-                    _id: entity
-                }, function(err, doc) {
-                    if (err || !doc)
-                        return emit("error", "Entity not found");
-                    var mysoc = "";
-                    mysoc = "\\textbf{\\large " + doc.name + "}\\\\" + doc.address.replace(/\n/g, "\\\\") + "\\\\" + doc.zip + " " + doc.town;
-                    if (doc.phone)
-                        mysoc += "\\\\Tel : " + doc.phone;
-                    if (doc.fax)
-                        mysoc += "\\\\ Fax : " + doc.fax;
-                    if (doc.email)
-                        mysoc += "\\\\ Email : " + doc.email;
-                    if (doc.tva_intra)
-                        mysoc += "\\\\ TVA Intra. : " + doc.tva_intra;
-                    tex = tex.replace(/--MYSOC--/g, mysoc);
-                    var foot = "";
-                    foot = "\\textsc{" + doc.name + "} - " + doc.idprof2 + " - NAF : " + doc.idprof3;
-                    if (doc.idprof1)
-                        foot += " - " + doc.idprof4;
-                    foot += " - " + doc.address + " " + doc.zip + " " + doc.town;
-                    foot += " - " + dict.values[doc.forme_juridique_code].label + " - capital " + doc.capital + " euros";
+            EntityModel.findOne({
+                _id: entity
+            }, function(err, doc) {
+                if (err || !doc)
+                    return emit("error", "Entity not found");
+                var mysoc = "";
+                mysoc = "\\textbf{\\large " + doc.name + "}\\\\" + doc.address.street.replace(/\n/g, "\\\\") + "\\\\" + doc.address.zip + " " + doc.address.city;
+                if (doc.phone)
+                    mysoc += "\\\\Tel : " + doc.phones.phone;
+                if (doc.fax)
+                    mysoc += "\\\\ Fax : " + doc.phones.fax;
+                if (doc.email)
+                    mysoc += "\\\\ Email : " + doc.emails[0].email;
+                if (doc.companyInfo.idprof6)
+                    mysoc += "\\\\ TVA Intra. : " + doc.companyInfo.idprof6;
+                tex = tex.replace(/--MYSOC--/g, mysoc);
+                var foot = "";
+                foot = "\\textsc{" + doc.name + "} - " + doc.companyInfo.idprof2 + " - NAF : " + doc.companyInfo.idprof3;
+                if (doc.companyInfo.idprof1)
+                    foot += " - " + doc.companyInfo.idprof4;
+                foot += " - " + doc.address.street + " " + doc.address.zip + " " + doc.address.city;
+                foot += " - " + dict.values[doc.companyInfo.forme_juridique_code].label + " - capital " + doc.companyInfo.capital + " euros";
 
-                    tex = tex.replace(/--FOOT--/g, foot);
-                    tex = tex.replace(/--VATMODE--/g, i18n.t("bills:VATmode." + doc.tva_mode));
-                    tex = tex.replace(/--ENTITY--/g, "\\textbf{" + doc.name + "}");
-                    if (doc.iban)
-                        tex = tex.replace(/--IBAN--/g, doc.iban.name + "\\\\RIB : " + doc.iban.rib + "\\\\ IBAN : " + doc.iban.iban + "\\\\ BIC : " + doc.iban.bic);
-                    else
-                        tex = tex.replace(/--IBAN--/g, "RIB sur demande.");
-                    tex = tex.replace(/--LOGO--/g, doc.logo);
-                    tex = tex.replace(/é/g, "\\'e");
-                    tex = tex.replace(/è/g, "\\`e");
+                if (doc.langs.length && doc.langs[0].invoiceFoot)
+                    foot += "\\\\" + doc.langs[0].invoiceFoot;
 
-                    if (doc.cgv && cgv)
-                        tex += "\n" + "\\input{" + doc.cgv.split(".")[0] + "}";
+                tex = tex.replace(/--FOOT--/g, foot);
+                tex = tex.replace(/--VATMODE--/g, i18n.t("orders:VATmode." + doc.tva_mode));
+                tex = tex.replace(/--ENTITY--/g, "\\textbf{" + doc.name + "}");
+                if (doc.iban && doc.iban.id)
+                    tex = tex.replace(/--IBAN--/g, doc.iban.bank + "\\\\ IBAN : " + doc.iban.id + "\\\\ BIC : " + doc.iban.bic);
+                else
+                    tex = tex.replace(/--IBAN--/g, "RIB/IBAN sur demande.");
+                tex = tex.replace(/--LOGO--/g, doc.logo);
+                tex = tex.replace(/é/g, "\\'e");
+                tex = tex.replace(/è/g, "\\`e");
 
-                    done(null, tex);
-                });
+                if (doc.cgv && cgv)
+                    tex += "\n" + "\\input{" + doc.cgv.split(".")[0] + "}";
+
+                done(null, tex);
             });
         });
     };
@@ -392,7 +424,7 @@ Template.prototype.compile = function(layout, inputTex) {
 
     var compile = function(tex) {
         // make temporary directory to create and compile latex pdf
-        var dirPath = framework.path.temp() + "pdfcreator-" + shortId.generate();
+        var dirPath = F.path.temp() + "pdfcreator-" + shortId.generate();
 
         fs.mkdirSync(dirPath);
 

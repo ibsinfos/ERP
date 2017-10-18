@@ -1,10 +1,33 @@
+/**
+Copyright 2017 ToManage
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+@author    ToManage SAS <contact@tomanage.fr>
+@copyright 2014-2017 ToManage SAS
+@license   http://www.apache.org/licenses/LICENSE-2.0 Apache License, Version 2.0
+International Registered Trademark & Property of ToManage SAS
+*/
+
+
+
 "use strict";
 
 /**
  * Module dependencies.
  */
 var mongoose = require('mongoose'),
-        Schema = mongoose.Schema;
+    Schema = mongoose.Schema;
 
 var DataTable = require('mongoose-datatable');
 
@@ -16,15 +39,7 @@ mongoose.plugin(DataTable.init);
 
 var setPrice = MODULE('utils').setPrice;
 var setDate = MODULE('utils').setDate;
-
-var setAccount = function (account) {
-    if (account) {
-        account = account.replace(/ /g, "");
-        account = account.substring(0, CONFIG('accounting.length') || 10); //limit a 10 character
-    }
-
-    return account;
-};
+var setAccount = MODULE('utils').setAccount;
 
 /**
  * Article Schema
@@ -32,40 +47,58 @@ var setAccount = function (account) {
 var TransationSchema = new Schema({
     credit: Number,
     debit: Number,
-    meta: Schema.Types.Mixed,
-    /*
-     meta : {
-        billsSupplier: [
-            {
-                amount: Number,
-                billSupplierRef: String,
-                billSupplierId: String
+
+    meta: {
+        isWaiting: Boolean, // Waiting bank transfert (CHQ)
+        bills: [{
+            _id: false,
+            amount: Number,
+            invoice: {
+                type: Schema.Types.ObjectId,
+                ref: 'invoice'
             }
-        ],
-        bills: [
-            {
-                amount: Number,
-                billRef: String,
-                billId: String
-            }
-        ],
-        productRef : String,
-        productId:String,
-        societeName: String,
-        societeId: String,
-        pieceAccounting : String,
-        type: String,
-        tva_tx : Number
-    }
-     */
-    
-    
-    datetime: {type: Date, set: setDate},
+        }],
+        invoice: {
+            type: Schema.Types.ObjectId,
+            ref: 'invoice'
+        }, // TODO remove after v0.514
+        product: {
+            type: Schema.Types.ObjectId,
+            ref: 'product'
+        },
+        bank: {
+            type: Schema.Types.ObjectId,
+            ref: 'bank'
+        },
+        supplier: {
+            type: Schema.Types.ObjectId,
+            ref: 'Customers'
+        },
+        pieceAccounting: String,
+        type: {
+            type: String
+        },
+        tax: {
+            type: Schema.Types.ObjectId,
+            ref: 'taxes'
+        }
+    },
+
+    datetime: {
+        type: Date,
+        set: setDate
+    },
     account_path: [String],
-    accounts: {type: String, set: setAccount},
+    accounts: {
+        type: String,
+        set: setAccount
+    },
     book: String,
     //entity: {type: String, required: true},
-    memo: {type: String, uppercase: true},
+    memo: {
+        type: String,
+        uppercase: true
+    },
     _journal: {
         type: Schema.Types.ObjectId,
         ref: 'Medici_Journal'
@@ -86,52 +119,17 @@ var TransationSchema = new Schema({
     },
     exported: Date, // Date of export
     reconcilliation: Date, //Only for rapprochement in bank
-    seq: {type: String} /*Numero de piece*/
+    seq: {
+        type: String
+    } /*Numero de piece*/
 }, {
-    toObject: {virtuals: true},
-    toJSON: {virtuals: true}
+    toObject: {
+        virtuals: true
+    },
+    toJSON: {
+        virtuals: true
+    }
 });
-
-/**
- * Pre-save hook
- */
-TransationSchema.pre('save', function (next) {
-    /*var SeqModel = MODEL('Sequence').Schema;
-     var EntityModel = MODEL('entity').Schema;
-     
-     var self = this;
-     if (!this.ref && this.isNew) {
-     SeqModel.inc("PROV", function (seq) {
-     //console.log(seq);
-     self.ref = "PROV" + seq;
-     next();
-     });
-     } else {
-     if (this.Status != "DRAFT" && this.total_ht != 0 && this.ref.substr(0, 4) == "PROV") {
-     EntityModel.findOne({_id: self.entity}, "cptRef", function (err, entity) {
-     if (err)
-     console.log(err);
-     
-     if (entity && entity.cptRef) {
-     SeqModel.inc("FA" + entity.cptRef, self.datec, function (seq) {
-     //console.log(seq);
-     self.ref = "FA" + entity.cptRef + seq;
-     next();
-     });
-     } else {
-     SeqModel.inc("FA", self.datec, function (seq) {
-     //console.log(seq);
-     self.ref = "FA" + seq;
-     next();
-     });
-     }
-     });
-     } else {*/
-    next();
-    //}
-    //}
-});
-
 
 exports.Schema = mongoose.model('Transaction', TransationSchema, 'Transaction');
 exports.name = 'transaction';

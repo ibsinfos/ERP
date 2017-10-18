@@ -1,15 +1,38 @@
+/**
+Copyright 2017 ToManage
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+@author    ToManage SAS <contact@tomanage.fr>
+@copyright 2014-2017 ToManage SAS
+@license   http://www.apache.org/licenses/LICENSE-2.0 Apache License, Version 2.0
+International Registered Trademark & Property of ToManage SAS
+*/
+
+
+
 "use strict";
 
 var fs = require('fs'),
-        _ = require('lodash'),
-        moment = require('moment'),
-        async = require('async');
+    _ = require('lodash'),
+    moment = require('moment'),
+    async = require('async');
 
 
 var Dict = INCLUDE('dict');
 
 
-exports.install = function () {
+exports.install = function() {
 
     var object = new Object();
 
@@ -48,12 +71,13 @@ exports.install = function () {
 
 };
 
-function Object() {
-}
+function Object() {}
 
 Object.prototype = {
-    userGroupId: function (req, res, next, id) {
-        UserGroupModel.findOne({_id: id}, function (err, doc) {
+    userGroupId: function(req, res, next, id) {
+        UserGroupModel.findOne({
+            _id: id
+        }, function(err, doc) {
             if (err)
                 return next(err);
             if (!doc)
@@ -63,28 +87,34 @@ Object.prototype = {
             next();
         });
     },
-    read: function () {
+    read: function() {
         var self = this;
         var UserGroupModel = MODEL('group').Schema;
-        var UserModel = MODEL('user').Schema;
+        var UserModel = MODEL('Users').Schema;
         var user;
         var userGroup = [];
 
-        UserGroupModel.find(function (err, groups) {
-            UserModel.find(function (err, doc) {
+        UserGroupModel.find(function(err, groups) {
+            UserModel.find(function(err, doc) {
 
                 user = doc;
 
                 var counter;
                 var i, j;
-                groups.forEach(function (group) {
+                groups.forEach(function(group) {
                     counter = 0;
                     for (j in user) {
                         if (user[j].groupe === group._id)
                             counter = counter + 1;
                     }
 
-                    userGroup.push({_id: group._id, id: group._id, name: group.name, count: counter, description: group.notes});
+                    userGroup.push({
+                        _id: group._id,
+                        id: group._id,
+                        name: group.name,
+                        count: counter,
+                        description: group.notes
+                    });
                 });
 
                 //console.log(userGroup);
@@ -92,14 +122,16 @@ Object.prototype = {
             });
         });
     },
-    uniqName: function (req, res) {
+    uniqName: function(req, res) {
 
         if (!req.query.name)
             return res.send(404);
 
         var id = "group:" + req.query.name;
 
-        UserGroupModel.findOne({_id: id}, "name", function (err, doc) {
+        UserGroupModel.findOne({
+            _id: id
+        }, "name", function(err, doc) {
             if (err)
                 return next(err);
             if (!doc)
@@ -109,16 +141,18 @@ Object.prototype = {
         });
 
     },
-    listUsers: function () {
+    listUsers: function() {
         var self = this;
-        var UserModel = MODEL('user').Schema;
+        var UserModel = MODEL('Users').Schema;
 
         if (!self.query.group)
             return self.throw404();
 
         var group = self.query.group;
 
-        UserModel.find({groupe: group}, function (err, doc) {
+        UserModel.find({
+            groupe: group
+        }, function(err, doc) {
             if (err)
                 return self.throw500(err);
             if (!doc)
@@ -129,16 +163,20 @@ Object.prototype = {
         });
 
     },
-    listNoUsers: function () {
+    listNoUsers: function() {
         var self = this;
-        var UserModel = MODEL('user').Schema;
+        var UserModel = MODEL('Users').Schema;
 
         if (!self.query.group)
             return self.throw404();
 
         var group = self.query.group;
 
-        UserModel.find({groupe: {$nin: [group]}}, "_id lastname firstname", function (err, doc) {
+        UserModel.find({
+            groupe: {
+                $nin: [group]
+            }
+        }, "_id lastname firstname", function(err, doc) {
             if (err)
                 return self.throw500(err);
             if (!doc)
@@ -149,37 +187,45 @@ Object.prototype = {
         });
 
     },
-    addToGroup: function () {
+    addToGroup: function() {
         var self = this;
-        var UserModel = MODEL('user').Schema;
+        var UserModel = MODEL('Users').Schema;
         var user = self.query.user;
         var groupe = self.query.groupe;
 
-        UserModel.update({_id: user}, {$set: {groupe: groupe}}, function (err, doc) {
+        UserModel.update({
+            _id: user
+        }, {
+            $set: {
+                groupe: groupe
+            }
+        }, function(err, doc) {
             if (err)
                 return self.throw500(err);
             self.json(doc);
         });
     },
-    create: function () {
+    create: function() {
         var self = this;
         var UserGroupModel = MODEL('group').Schema;
         var userGroup = new UserGroupModel(self.body);
         var name = self.body.name;
 
-        userGroup._id = 'group' + name;
-        userGroup.save(function (err, doc) {
+        userGroup._id = name;
+        userGroup.save(function(err, doc) {
             if (err)
                 return self.throw500(err);
             //return console.log(err);
             self.json(userGroup);
         });
     },
-    show: function (id) {
+    show: function(id) {
         var self = this;
         var UserGroupModel = MODEL('group').Schema;
 
-        UserGroupModel.findOne({_id: id}, function (err, doc) {
+        UserGroupModel.findOne({
+            _id: id
+        }, function(err, doc) {
             if (err)
                 return self.throw500(err);
             if (!doc)
@@ -187,11 +233,11 @@ Object.prototype = {
             self.json(doc);
         });
     },
-    deleteUserGroup: function () {
+    deleteUserGroup: function() {
         var self = this;
         var userGroup = self.userGroup;
 
-        userGroup.remove(function (err) {
+        userGroup.remove(function(err) {
             if (err) {
                 self.render('error', {
                     status: 500
@@ -201,56 +247,63 @@ Object.prototype = {
             }
         });
     },
-    removeUserFromGroup: function () {
+    removeUserFromGroup: function() {
         var self = this;
         var user = self.query.user;
         var UserGroupModel = self.query.group;
-        var UserModel = MODEL('user').Schema;
+        var UserModel = MODEL('Users').Schema;
 
-        UserModel.update({_id: user}, {groupe: null}, function (err, doc) {
+        UserModel.update({
+            _id: user
+        }, {
+            groupe: null
+        }, function(err, doc) {
             if (err)
                 return self.throw500(err);
             self.json(doc);
         });
     },
-    update: function (id) {
+    update: function(id) {
         var self = this;
         var UserGroupModel = MODEL('group').Schema;
-        
-        UserGroupModel.findOne({_id: id}, function (err, group) {
-            group = _.extend(group, self.body);
-        
-        group.save(function (err, doc) {
 
-                if (err)
-                    return self.json({errorNotify: {
-                            title: 'Erreur',
-                            message: err
-                        }
-                    });
+        console.log(self.body);
+        self.body.updatedAt = new Date();
+        self.body.editedBy = self.user._id;
 
-                doc = doc.toObject();
-                doc.successNotify = {
-                    title: "Success",
-                    message: "groupe enregistré"
-                };
-                self.json(doc);
-            });
+        UserGroupModel.findByIdAndUpdate(id, self.body, {
+            new: true
+        }, function(err, doc) {
+
+            if (err)
+                return self.json({
+                    errorNotify: {
+                        title: 'Erreur',
+                        message: err
+                    }
+                });
+
+            doc = doc.toObject();
+            doc.successNotify = {
+                title: "Success",
+                message: "groupe enregistré"
+            };
+            self.json(doc);
         });
     },
-    list: function () {
+    list: function() {
         var self = this;
         var fields = self.query.fields;
         var UserGroupModel = MODEL('group').Schema;
 
-        UserGroupModel.find("ALL", fields, function (err, doc) {
+        UserGroupModel.find("ALL", fields, function(err, doc) {
             if (err)
-                       return self.throw500(err);
+                return self.throw500(err);
             self.json(doc);
         });
     },
 
-    readDT: function () {
+    readDT: function() {
         var self = this;
         var UserGroupModel = MODEL('group').Schema;
         var query = JSON.parse(self.req.body.query);
@@ -259,7 +312,9 @@ Object.prototype = {
         //console.log(self.query);
 
         var conditions = {
-            isremoved: {$ne: true}
+            isremoved: {
+                $ne: true
+            }
         };
 
         if (!query.search.value) {
@@ -273,16 +328,16 @@ Object.prototype = {
 
         var options = {
             conditions: conditions
-                    //select: ""
+            //select: ""
         };
 
         //console.log(options);
 
         async.parallel({
-            datatable: function (cb) {
+            datatable: function(cb) {
                 UserGroupModel.dataTable(query, options, cb);
             }
-        }, function (err, res) {
+        }, function(err, res) {
             if (err)
                 return self.throw500(err);
 

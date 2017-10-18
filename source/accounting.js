@@ -1,3 +1,26 @@
+/**
+Copyright 2017 ToManage
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+@author    ToManage SAS <contact@tomanage.fr>
+@copyright 2014-2017 ToManage SAS
+@license   http://www.apache.org/licenses/LICENSE-2.0 Apache License, Version 2.0
+International Registered Trademark & Property of ToManage SAS
+*/
+
+
+
 "use strict";
 
 //https://github.com/jraede/medici
@@ -41,8 +64,9 @@ Entry.prototype.setSeq = function(seq) {
     return this;
 };
 
-Entry.prototype.credit = function(account_path, amount, extra) {
+Entry.prototype.credit = function(account_path, amount, memo, extra) {
     var key, keys, meta, transaction, val;
+
     if (extra == null) {
         extra = null;
     }
@@ -67,7 +91,7 @@ Entry.prototype.credit = function(account_path, amount, extra) {
         debit: 0.0,
         book: this.book.name,
         //entity: this.book.entity,
-        memo: this.journal.memo,
+        memo: memo || this.journal.memo,
         _journal: this.journal._id,
         datetime: this.journal.datetime,
         _original_journal: this.journal._original_journal,
@@ -88,7 +112,7 @@ Entry.prototype.credit = function(account_path, amount, extra) {
     return this;
 };
 
-Entry.prototype.debit = function(account_path, amount, extra) {
+Entry.prototype.debit = function(account_path, amount, memo, extra) {
     var key, keys, meta, transaction, val;
     if (extra == null) {
         extra = null;
@@ -115,7 +139,7 @@ Entry.prototype.debit = function(account_path, amount, extra) {
         _journal: this.journal._id,
         book: this.book.name,
         //entity: this.book.entity,
-        memo: this.journal.memo,
+        memo: memo || this.journal.memo,
         datetime: this.journal.datetime,
         _original_journal: this.journal._original_journal
     };
@@ -268,8 +292,7 @@ exports.Book.prototype.entry = function(memo, date, author, original_journal) {
     if (original_journal == null) {
         original_journal = null;
     }
-    if (author == null)
-        author = {};
+
     return new Entry(this, memo, date, author, original_journal);
 };
 
@@ -562,7 +585,10 @@ exports.Book.prototype.balance = function(query) {
                         result[i].debit = MODULE('utils').round(result[i].debit, 2);
 
                         if (isNormalInteger(result[i]._id))
-                            result[i]._id = fixedWidthString(result[i]._id, 10, { padding: '0', align: 'left' });
+                            result[i]._id = fixedWidthString(result[i]._id, 10, {
+                                padding: '0',
+                                align: 'left'
+                            });
 
                         delete result[i].notes;
                     }
@@ -598,7 +624,36 @@ exports.Book.prototype.ledger = function(query, populate) {
         delete query.page;
     }
     query = this.parseQuery(query);
-    q = this.transactionModel.find(query);
+    q = this.transactionModel.find(query)
+        .populate({
+            path: "meta.supplier",
+            select: "name ID",
+            model: "Customers"
+        })
+        .populate({
+            path: "meta.invoice",
+            select: "ref forSales",
+            model: "invoice"
+        })
+        .populate({
+            path: "meta.bills.invoice",
+            select: "ref forSales",
+            model: "invoice"
+        })
+        .populate({
+            path: "meta.product",
+            select: "info sellFamily costFamily",
+            model: "product",
+            populate: {
+                path: "sellFamily costFamily"
+            }
+        })
+        .populate({
+            path: "meta.tax",
+            select: "code",
+            model: "taxes"
+        });
+
     //console.log(query);
     if (pagination) {
         this.transactionModel.count(query, function(err, count) {
@@ -765,7 +820,7 @@ exports.Book.prototype.setReconcilliation = function(journal_id, date) {
     this.journalModel.findById(journal_id, function(err, journal) {
         if (err)
             return deferred.reject(err);
-        if (!journal)
+        else if (!journal)
             return deferred.reject("JournalId not found");
 
         return journal.setReconcilliation(_this, date).then(function() {

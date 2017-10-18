@@ -29,6 +29,7 @@
     "SalesRepresentative": "Commercial",
     "SalesRepresentatives": "Commerciaux",
     "SalesRepresentativeFollowUp": "Commercial (suivi)",
+    "CommercialFollow": "Suivi commercial",
     "SalesRepresentativeSignature": "Commercial (signature)",
     "CommercialInterlocutor": "Interlocuteur commercial",
     "ErrorWrongCode": "Code incorrect",
@@ -40,6 +41,7 @@
     "ListOfCustomers": "Liste des clients",
     "ListOfSuspects": "Liste des suspects",
     "ListOfAll": "Liste de tous les comptes",
+    "ChoiseContact": "Choisir le contact",
     "ListSuspectsShort": "Liste suspects",
     "ListAllShort": "Liste tous les comptes",
     "LastDoneTasks": "Les %s dernières actions effectuées",
@@ -100,8 +102,12 @@
     "Attractiveness": "Attractivité",
     "CAOrderByMonth": "CA du mois",
     "CAOrderByYear": "CA de l'année",
-    "CAPropalByMonth":"Total Propositions",
-    "DateLastAction":"Dernière action",
-    "ListProductsPrices":"Liste de prix",
-    "Buyer":"Acheteur"
+    "CAPropalByMonth": "Total des propositions",
+    "NumberOfOrdersByMonth": "Nombre de commandes par mois",
+    "DateLastAction": "Dernière action",
+    "ListProductsPrices": "Liste de prix",
+    "Buyer": "Acheteur",
+    "ConversionRate": "Taux de conversion",
+    "ThirdPartyBilling": "Facturation de tiers",
+    "ImportExport": "Import - Export"
 }

@@ -1,3 +1,26 @@
+/**
+Copyright 2017 ToManage
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+@author    ToManage SAS <contact@tomanage.fr>
+@copyright 2014-2017 ToManage SAS
+@license   http://www.apache.org/licenses/LICENSE-2.0 Apache License, Version 2.0
+International Registered Trademark & Property of ToManage SAS
+*/
+
+
+
 "use strict";
 
 var async = require('async'),
@@ -12,6 +35,8 @@ var rights = [];
 exports.install = function() {
 
     console.log("ToManage modules install...");
+
+    F.global.filters = {};
 
     //F.once('i18n', function() {
     fs.readdirSync(__dirname + '/../json').forEach(function(file) {
@@ -39,14 +64,20 @@ exports.install = function() {
             /* Load Menu : 3 levels MAX */
 
             for (var i in data.menus) {
+                if (data.menus[i].enabled == false)
+                    continue;
                 if (data.menus[i].title)
                     data.menus[i].title = i18n.t(data.menus[i].title);
                 if (data.menus[i].submenus) {
                     for (var j in data.menus[i].submenus) {
+                        if (data.menus[i].submenus[j].enabled == false)
+                            continue;
                         if (data.menus[i].submenus[j].title)
                             data.menus[i].submenus[j].title = i18n.t(data.menus[i].submenus[j].title);
                         if (data.menus[i].submenus[j].submenus) {
                             for (var k in data.menus[i].submenus[j].submenus) {
+                                if (data.menus[i].submenus[j].submenus[k].enabled == false)
+                                    continue;
                                 if (data.menus[i].submenus[j].submenus[k].title)
                                     data.menus[i].submenus[j].submenus[k].title = i18n.t(data.menus[i].submenus[j].submenus[k].title);
                             }
@@ -56,6 +87,8 @@ exports.install = function() {
             }
 
             menus = _.defaults(menus, data.menus);
+
+            F.global.filters = _.extend(F.global.filters, data.filters);
 
             for (var i in data.menus) {
                 // Convert for old menu speedealing

@@ -1,0 +1,218 @@
+<div ng-if="societe.isremoved" class="alert alert-danger">
+    <strong>@(BeCareful)</strong>@(companies:CompanyDeleted)</div>
+
+<div class="page-bar" ng-init="findOne()">
+    <ul class="page-breadcrumb">
+        <li>
+            <i class="fa fa-home"></i>
+            <a ui-sref="home">@(Home)</a>
+            <i class="fa fa-angle-right"></i>
+        </li>
+        <li>
+            <span>@(companies:ThirdParties)</span>
+            <i class="fa fa-angle-right"></i>
+        </li>
+        <li>
+            <a ng-hide="societe.type == 'Person'" ui-sref="societe.list">@(companies:CustomerList)</a>
+            <a ng-hide="societe.type == 'Company'" ui-sref="contact.list">@(companies:ListOfContacts)</a>
+            <i class="fa fa-angle-right"></i>
+        </li>
+        <li>
+            <span ng-hide="societe.type == 'Company'"> @(companies:CustomerCardOf) {{societe.fullName}}</span>
+            <span ng-hide="societe.type == 'Person'"> @(companies:CardCompanyOf) {{societe.fullName}}</span>
+        </li>
+
+        <li>
+            <small ng-hide="!societe.salesPurchases.isActive" class="font-yellow-crusta sbold">@(Enabled)</small><small ng-show="!societe.salesPurchases.isActive" class="font-red">@(Disabled)</small>
+        </li>
+    </ul>
+    <div class="page-toolbar" ng-hide="societe.isremoved">
+        <div class="btn-group">
+            <a class="btn yellow-crusta dropdown-toggle uppercase" href="javascript:;" data-toggle="dropdown">
+                <i class="fa fa-share"></i> @(Tools) <i class="fa fa-angle-down"></i>
+            </a>
+            <ul class="dropdown-menu pull-right">
+                <li>
+                    <a href="#" ng-click="clone()">
+                        <i class="fa fa-copy"></i> @(ToClone)
+                    </a>
+                </li>
+                <li ng-if="societe.sha1">
+                    <a ng-href="https://atlankit.extene.com/inputERP?__method=autoLogin&email={{societe.emails[0].email.toUpperCase()}}&token={{societe.sha1}}" target="_blank">
+                        <i class="fa fa-key"></i> @(Prestashop)
+                    </a>
+                </li>
+                <li>
+                    <a href="#" class="font-red" ng-show="login.rights.societe.delete" confirmed-click="remove(societe)" ng-confirm-click="Supprimer la societe ?" title="Supprimer la societe">
+                        <i class="fa fa-trash-o font-red"></i> @(Delete)
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<!--<h3 ng-show="societe.type == 'Person'" class="page-title" ng-class="{'font-red':!societe.salesPurchases.isActive}">
+    <i class="fa fa-cubes font-grey-silver"></i> @(companies:CustomerCard) / @(companies:Contact) : {{societe.fullName}} <small ng-hide="!societe.salesPurchases.isActive" class="font-yellow">@(Enabled)</small><small ng-show="!societe.salesPurchases.isActive"
+        class="font-grey">@(Disabled)</small>
+</h3>
+
+<h3 ng-show="societe.type == 'Company'" class="page-title" ng-class="{'font-red':!societe.salesPurchases.isActive}">
+    <i class="fa fa-cubes font-grey-silver"></i> @(companies:CardCompany) / @(companies:Contact) : {{societe.fullName}} <small ng-hide="!societe.salesPurchases.isActive" class="font-yellow">@(Enabled)</small><small ng-show="!societe.salesPurchases.isActive"
+        class="font-grey">@(Disabled)</small>
+</h3>-->
+
+<div ng-if="societe.isremoved" class="alert alert-danger">@(BeCareful) !<strong>@(companies:ThisCompanyIsDeleted) </div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="profile-sidebar mt-element-ribbon portlet-fit bordered">
+            <div ng-hide="!societe._id" class="ribbon ribbon-right ribbon-clip ribbon-shadow uppercase ribbon-color-success" ng-class="societe._status.css ">
+                <div class="ribbon-sub ribbon-clip ribbon-right "></div> {{societe._status.name}}
+            </div>
+            <div class="portlet light profile-sidebar-portlet">
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="col-md-6">
+                            <div class="profile">
+                                <img ng-src="{{getImage('product', product.imageSrc)}}" class="img-responsive" alt="Product" />
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="profile-usertitle">
+                                <div class="uppercase profile-stat-title"> {{societe.fullName}}
+                                </div>
+                                <hr>
+                                <div class="profile-userbuttons">
+                                    <div class="md-checkbox has-success">
+                                <input type="checkbox" id="isActive" class="md-check" ng-model="societe.salesPurchases.isActive" ng-checked="societe.salesPurchases.isActive">
+                                <label for="isActive">
+                                    <span></span>
+                                    <span class="check"></span>
+                                    <span class="box"></span> @(Activated)</label>
+                                </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <hr>
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="col-md-6">
+                            <div class="md-checkbox-list">
+                                <div class="md-checkbox">
+                                <input type="checkbox" id="isProspect" class="md-check" ng-change="(societe.salesPurchases.isProspect?societe.salesPurchases.isCustomer = false:null)" ng-model="societe.salesPurchases.isProspect" ng-checked="societe.salesPurchases.isProspect">
+                                <label for="isProspect">
+                                    <span></span>
+                                    <span class="check"></span>
+                                    <span class="box"></span> @(companies:Prospect)</label>
+                                </div>
+                                <div class="md-checkbox">
+                                <input type="checkbox" id="isCustomer" class="md-check" ng-change="(societe.salesPurchases.isCustomer?societe.salesPurchases.isProspect = false:null)" ng-model="societe.salesPurchases.isCustomer" ng-checked="societe.salesPurchases.isCustomer">
+                                <label for="isCustomer">
+                                    <span></span>
+                                    <span class="check"></span>
+                                    <span class="box"></span> @(companies:Customer)</label>
+                                </div> 
+                            </div>                        
+                        </div>        
+                        <div class="col-md-6">
+                            <div class="md-checkbox-list">
+                                <div class="md-checkbox">
+                                <input type="checkbox" id="isSupplier" class="md-check" ng-model="societe.salesPurchases.isSupplier" ng-checked="societe.salesPurchases.isSupplier">
+                                <label for="isSupplier">
+                                    <span></span>
+                                    <span class="check"></span>
+                                    <span class="box"></span> @(companies:Supplier)</label>
+                                </div>
+                                <div class="md-checkbox">
+                                <input type="checkbox" id="isSubcontractor" class="md-check" ng-model="societe.salesPurchases.isSubcontractor" ng-checked="societe.salesPurchases.isSubcontractor">
+                                <label for="isSubcontractor">
+                                    <span></span>
+                                    <span class="check"></span>
+                                    <span class="box"></span> @(companies:Subcontractor)</label>
+                                </div> 
+                            </div>                    
+                        </div> 
+                    </div>           
+                </div>
+                <div class="progress">
+                    <div class="progress-bar progress-bar-warning" role="progressbar" aria-valuenow="60" aria-valuemin="0" aria-valuemax="100" style="width: 60%">
+                        <span class="sr-only"> 60% Complete </span>
+                    </div>
+                </div>
+
+                <div class="profile-usermenu">
+                    <ul class="nav">
+                        <li ng-show="societe.type == 'Person'" ng-class="{active: $state.includes('societe.show.person')}">
+                            <a ui-sref="societe.show.person({id:societe._id})">
+                                <i class="icon-info"></i> @(Informations) </a>
+                        </li>
+                        <li ng-show="societe.type == 'Company'" ng-class="{active: $state.includes('societe.show.company')}">
+                            <a ui-sref="societe.show.company({id:societe._id})">
+                                <i class="icon-info"></i> @(Informations) </a>
+                        </li>
+                        <li ng-class="{active: $state.includes('societe.show.addresses')}">
+                            <a ui-sref="societe.show.addresses({id:societe._id})">
+                                <i class="icon-user"></i> @(ContactsAddressesForCompany) </a>
+                        </li>
+                        <li ng-if="societe.salesPurchases.isCustomer || societe.salesPurchases.isProspect" ng-class="{active: $state.includes('societe.show.commercial')}">
+                            <a ui-sref="societe.show.commercial({id:societe._id})">
+                                <i class="icon-basket"></i> @(commercial:Commercial) </a>
+                        </li>
+                        <li ng-class="{active: $state.includes('societe.show.billing')}">
+                            <a ui-sref="societe.show.billing({id:societe._id})">
+                                <i class="icon-credit-card"></i> @(orders:Billing) </a>
+                        </li>
+                      <!--   <li ng-class="{active: $state.includes('societe.show.task')}">
+                            <a ui-sref="societe.show.task({id:societe._id})">
+                                <i class="icon-bubbles"></i> @(tasks:Tasks) </a>
+                        </li>
+                       <li ng-class="{active: $state.includes('societe.show.feeds')}">
+                            <a ui-sref="societe.show.feeds({id:societe._id})">
+                                <i class="icon-bell"></i> @(tasks:Actions) </a>
+                        </li>-->
+                        <!--<li ng-class="{active: $state.includes('societe.show.files')}">
+                            <a ui-sref="societe.show.files({id:societe._id})">
+                                <i class="icon-picture"></i> @(products:Images/documents) </a>
+                        </li>-->
+                        <!--<li ng-class="{active: $state.includes('societe.show.stats')}">
+                            <a ui-sref="societe.show.stats({id:societe._id})">
+                                <i class="icon-bar-chart"></i> @(Statistics) </a>
+                        </li>-->
+                    </ul>
+                </div>
+            </div>
+            <div class="portlet light">
+                <div class="row list-separated profile-stat">
+                    <div class=" col-md-6 col-sm-6 col-xs-6">
+                        <div class="uppercase profile-stat-title"> <i class="icon-calendar font-yellow-crusta"></i> {{societe.createdAt|date:'dd/MM/yyyy HH:mm'}} </div>
+                    </div>
+                    <div class="col-md-6 col-sm-6 col-xs-6">
+                        <div class="uppercase profile-stat-title"> <i class="icon-refresh font-yellow-crusta"></i> {{societe.updatedAt|date:'dd/MM/yyyy HH:mm'}} </div>
+                    </div>
+
+                    <div>
+                        <div class="col-md-6 col-sm-6 col-xs-6">
+                            <div class="uppercase profile-stat-title"> <a class="font-yellow-crusta">{{societe.createdBy.username}}</a> </div>
+                            <!--<div class="uppercase profile-stat-text"> @(CreatedBy)</div>-->
+                        </div>
+                        <div class="col-md-6 col-sm-6 col-xs-6">
+                            <div class="uppercase profile-stat-title"> <a class="font-yellow-crusta">{{societe.editedBy.username}}</a> </div>
+                            <!-- <div class="uppercase profile-stat-text"> @(EditedBy) </div>-->
+                        </div>
+                    </div>
+                </div>
+                 <div class="row list-separated profile-stat ">
+                    <div class="col-md-12 ">
+                        <div class="uppercase profile-stat-text ">@(Logs)</div>
+                        <div class="uppercase profile-stat-title "> {{societe.history.date| date:'dd/MM/yyyy HH:mm'}} {{object.history.msg}}</div>
+                    </div>
+                </div>
+            </div>
+            <div ng-if="societe._id" ng-include="'/templates/gridfs/fileAll.html'" ng-controller="FileCtrl" onload="init('Customers', societe)"></div>
+        </div>
+        <div ui-view class="profile-content fade-in-up"></div>
+    </div>
+</div>

@@ -1,3 +1,26 @@
+/**
+Copyright 2017 ToManage
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+@author    ToManage SAS <contact@tomanage.fr>
+@copyright 2014-2017 ToManage SAS
+@license   http://www.apache.org/licenses/LICENSE-2.0 Apache License, Version 2.0
+International Registered Trademark & Property of ToManage SAS
+*/
+
+
+
 MetronicApp.directive("markdownEditor", function($rootScope) {
     return {
         restrict: "A",
@@ -12,19 +35,16 @@ MetronicApp.directive("markdownEditor", function($rootScope) {
 
             var obj = false; // Test if it's an object for fiche.societe.report or a single value
             var newData;
-            if(typeof scope.data === 'object') {
-                obj=true;
-            
-            newData = {
-                new: scope.data.new,
-                old: scope.data.new,
-                datec: new Date(),
-                author: {
-                    id: $rootScope.login._id,
-                    name: $rootScope.login.name
-                }
-            };
-        }
+            if (typeof scope.data === 'object') {
+                obj = true;
+
+                newData = {
+                    new: scope.data.new,
+                    old: scope.data.new,
+                    datec: new Date(),
+                    author: $rootScope.login._id
+                };
+            }
 
             $('#markdownEditor').markdown({
                 savable: false,
@@ -32,7 +52,7 @@ MetronicApp.directive("markdownEditor", function($rootScope) {
                 resize: "vertical",
                 height: scope.height || 200,
                 onChange: function(e) {
-                    if(obj)
+                    if (obj)
                         newData.new = e.getContent();
                     else
                         newData = e.getContent();
@@ -40,7 +60,7 @@ MetronicApp.directive("markdownEditor", function($rootScope) {
                     ngModel.$setViewValue(newData);
                 },
                 onShow: function(e) {
-                    if(obj)
+                    if (obj)
                         e.setContent(newData.new);
                     else
                         e.setContent(scope.data);
@@ -118,7 +138,7 @@ MetronicApp.directive("markdownDiff", function() {
         },
         template: '<pre id="displayDiff"></pre>',
         link: function(scope, element, attrs) {
-            if(scope.origin !== scope.new)
+            if (scope.origin !== scope.new)
                 check();
 
             function check() {

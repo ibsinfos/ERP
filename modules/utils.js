@@ -1,3 +1,28 @@
+/**
+Copyright 2017 ToManage
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+@author    ToManage SAS <contact@tomanage.fr>
+@copyright 2014-2017 ToManage SAS
+@license   http://www.apache.org/licenses/LICENSE-2.0 Apache License, Version 2.0
+International Registered Trademark & Property of ToManage SAS
+*/
+
+
+
+"use strict";
+
 exports.name = 'utils';
 exports.version = '1.07';
 
@@ -30,6 +55,8 @@ numeral.register('locale', 'fr', {
 numeral.locale('fr');
 
 function round(value, decimals) {
+    if (!decimals)
+        decimals = 2;
     if (value > Math.pow(10, (decimals + 2) * -1) * -1 && value < Math.pow(10, (decimals + 2) * -1)) // Fix error little number
         return 0;
     return Number(Math.round(value + 'e' + (decimals)) + 'e-' + (decimals));
@@ -39,6 +66,107 @@ exports.round = round;
 
 exports.setPrice = function(value) {
     return round(value, 2);
+};
+
+exports.setRound3 = function(value) {
+    return round(value, 3);
+};
+
+exports.setTags = function(tags) {
+    var result = [];
+    for (var i = 0; i < tags.length; i++)
+        if (typeof tags[i] == "object" && tags[i].text)
+            result.push(tags[i].text.trim());
+        else
+            result.push(tags[i].trim());
+
+    result = _.uniq(result);
+
+    //console.log(result);
+    return result;
+};
+
+exports.setLink = function(link) {
+    if (!link)
+        return null;
+
+    if (link === "/") // only for root url in categories
+        return link;
+
+    link = link.replace(/[^a-zA-Z0-9]/g, '_');
+
+    //console.log(result);
+    return link;
+};
+
+exports.setLabel = function(txt) {
+    if (!txt)
+        return null;
+
+    txt = txt.replace(/[^a-zA-Z0-9 ]/g, '');
+
+    return txt;
+};
+
+exports.setAccount = function(account) {
+    if (account) {
+        account = account.replace(/ /g, "");
+        account = account.substring(0, CONFIG('accounting.length') || 10); //limit a 10 character
+    }
+
+    return account;
+};
+
+
+exports.setNoSpace = function(text) {
+    if (text)
+        text = text.replace(/ /g, "").trim();
+
+    return text;
+};
+
+exports.set_Space = function(text) {
+    if (text)
+        text = text.replace(/ /g, "_").trim();
+
+    return text;
+};
+
+exports.setPhone = function(phone) {
+    if (!phone)
+        return phone;
+
+    let PNF = require('google-libphonenumber').PhoneNumberFormat;
+    let phoneUtil = require('google-libphonenumber').PhoneNumberUtil.getInstance();
+
+    phone = phone.replace(/ /g, "").replace(/\./g, "").replace(/\(/g, "").replace(/\)/g, "").replace(/\+/g, "");
+    if (phone[0] == '0')
+        phone.substr(1);
+
+    let country = 'FR';
+    if (this.address && this.address.country)
+        country = this.address.country;
+    else if (this.country)
+        country = this.country;
+
+
+    let phoneNumber = phoneUtil.parse(phone, country || 'FR');
+
+    phone = phoneUtil.format(phoneNumber, PNF.INTERNATIONAL);
+
+    return phone;
+};
+
+exports.setFirstUpperCase = function(name) {
+    if (!name) {
+        return name;
+    }
+
+    name = name.toLowerCase();
+
+    name = name.charAt(0).toUpperCase() + name.substr(1);
+
+    return name;
 };
 
 exports.printPrice = function(value, width) {
@@ -128,7 +256,10 @@ exports.ObjectId = mongoose.Types.ObjectId;
  */
 
 var cond_reglement = {};
-Dict.dict({ dictName: "fk_payment_term", object: true }, function(err, docs) {
+Dict.dict({
+    dictName: "fk_payment_term",
+    object: true
+}, function(err, docs) {
     cond_reglement = docs;
 });
 
@@ -174,130 +305,353 @@ exports.calculate_date_lim_reglement = function(datec, cond_reglement_code) {
 
 exports.sumTotal = function(lines, shipping, discount, societeId, callback) {
 
-    var SocieteModel = MODEL('societe').Schema;
+    var SocieteModel = MODEL('Customers').Schema;
+    var TaxesModel = MODEL('taxes').Schema;
+    var round = exports.round;
 
-    async.waterfall([
-        function(cb) {
-            if (!societeId)
-                return cb(null, true);
+    var count = 0,
+        total_ht = 0,
+        total_taxes = [],
+        total_ttc = 0,
+        weight = 0;
 
-            SocieteModel.findOne({ _id: societeId }, "VATIsUsed", function(err, societe) {
-                if (err || !societe)
-                    return callback("Societe not found !");
+    //var taxesId = {};
+    //var taxes = [];
 
-                cb(null, societe.VATIsUsed);
-            });
-        }
-    ], function(err, VATIsUsed) {
-
-        var count = 0,
-            total_ht = 0,
-            total_tva = [],
-            total_ttc = 0,
-            weight = 0;
-
-        var i, j, length, found;
-        var subtotal = 0;
-
-        for (i = 0, length = lines.length; i < length; i++) {
-            // SUBTOTAL
-            if (lines[i].product.name == 'SUBTOTAL') {
-                lines[i].total_ht = subtotal;
-                subtotal = 0;
-                continue;
-            }
-
-            //console.log(object.lines[i].total_ht);
-            total_ht += lines[i].total_ht;
-            subtotal += lines[i].total_ht;
-            //this.total_ttc += this.lines[i].total_ttc;
-
-            if (VATIsUsed) {
-                //Add VAT
-                found = false;
-                for (j = 0; j < total_tva.length; j++)
-                    if (total_tva[j].tva_tx === lines[i].tva_tx) {
-                        total_tva[j].total += lines[i].total_tva;
-                        found = true;
-                        break;
-                    }
-
-                if (!found) {
-                    total_tva.push({
-                        tva_tx: lines[i].tva_tx,
-                        total: lines[i].total_tva
-                    });
-                }
-            }
-
-            //Poids total
-            weight += lines[i].weight * lines[i].qty;
-            count += lines[i].qty;
-        }
-
-        // shipping cost
-        if (shipping.total_ht) {
-            total_ht += shipping.total_ht;
-
-            if (VATIsUsed) {
-                shipping.total_tva = shipping.total_ht * shipping.tva_tx / 100;
-
-                //Add VAT
-                found = false;
-                for (j = 0; j < total_tva.length; j++)
-                    if (total_tva[j].tva_tx === shipping.tva_tx) {
-                        total_tva[j].total += shipping.total_tva;
-                        found = true;
-                        break;
-                    }
-
-                if (!found) {
-                    total_tva.push({
-                        tva_tx: shipping.tva_tx,
-                        total: shipping.total_tva
-                    });
-                }
-            } else
-                shipping.total_tva = 0;
-        }
-
-        if (discount && discount.discount && discount.discount.percent) {
-            discount.discount.value = exports.round(total_ht * discount.discount.percent / 100, 2);
-            total_ht -= discount.discount.value;
-
-            if (VATIsUsed)
-            // Remise sur les TVA
-                for (j = 0; j < total_tva.length; j++) {
-                total_tva[j].total -= total_tva[j].total * discount.discount.percent / 100;
-            }
-        }
-
-        if (discount && discount.escompte && discount.escompte.percent) {
-            discount.escompte.value = exports.round(total_ht * discount.escompte.percent / 100, 2);
-            total_ht -= discount.escompte.value;
-
-            if (VATIsUsed)
-            // Remise sur les TVA
-                for (j = 0; j < total_tva.length; j++) {
-                total_tva[j].total -= total_tva[j].total * discount.escompte.percent / 100;
-            }
-        }
-
-        total_ht = exports.round(total_ht, 2);
-        total_ttc = total_ht;
-
-        if (VATIsUsed)
-            for (j = 0; j < total_tva.length; j++) {
-                total_tva[j].total = exports.round(total_tva[j].total, 2);
-                total_ttc += total_tva[j].total;
-            }
-
-        callback(null, {
+    if (!lines || !lines.length)
+        return callback(null, {
             total_ht: total_ht,
-            total_tva: total_tva,
+            total_taxes: total_taxes,
             total_ttc: total_ttc,
             weight: weight,
             count: count
         });
-    });
+
+    async.waterfall([
+            function(cb) {
+                if (!societeId)
+                    return cb(null, true);
+
+                SocieteModel.findOne({
+                    _id: societeId
+                }, "salesPurchases.VATIsUsed", function(err, societe) {
+                    if (err || !societe)
+                        return callback("Societe not found !");
+
+                    cb(null, societe.salesPurchases.VATIsUsed);
+                });
+            },
+            function(VATIsUsed, cb) {
+                if (!VATIsUsed)
+                    return cb(null, VATIsUsed);
+
+                var rates = [];
+
+
+
+                lines = _.map(lines, function(elem) {
+                    elem.total_taxes = _.map(elem.total_taxes, function(tax) {
+                        if (tax.taxeId && tax.taxeId._id)
+                            tax.taxeId = tax.taxeId._id;
+                        return tax;
+                    });
+                    return elem;
+                });
+
+                //console.log(lines);
+
+                TaxesModel.populate(lines, "total_taxes.taxeId", function(err, lines) {
+                    if (err)
+                        return cb(err);
+
+                    if (!lines || !lines.length)
+                        return cb(null, VATIsUsed);
+
+                    _.each(lines, function(line) {
+                        //return console.log(line.total_taxes);
+                        if (line.isDeleted)
+                            return;
+
+                        if (!line.total_taxes || !line.total_taxes.length)
+                            return;
+
+                        for (var i = 0; i < line.total_taxes.length; i++) {
+                            //taxes.push(lines.product.taxes[i].taxeId);
+                            //if (taxesId[line.product.taxes[i].taxeId._id.toString()] != null) //Already in tab
+                            //    continue;
+
+                            let tax = _.find(total_taxes, _.matchesProperty("taxeId", line.total_taxes[i].taxeId._id.toString()));
+
+                            if (tax)
+                                continue;
+
+                            //taxesId[line.product.taxes[i].taxeId._id.toString()] = total_taxes.length;
+                            total_taxes.push({
+                                taxeId: line.total_taxes[i].taxeId._id.toString(),
+                                isFixValue: line.total_taxes[i].taxeId.isFixValue,
+                                sequence: line.total_taxes[i].taxeId.sequence,
+                                total: 0
+                            });
+                        }
+                    });
+
+                    //return;
+
+                    //Add VAT
+                    for (var i = 0, length = lines.length; i < length; i++) {
+                        //if (!lines[i].product)
+                        //    continue;
+                        if (lines[i].type !== 'product')
+                            continue;
+                        if (!lines[i].qty)
+                            continue;
+                        if (lines[i].isDeleted) {
+                            lines[i].qty = 0;
+                            lines[i].total_ht = 0;
+                            lines[i].discount = 0;
+                            continue;
+                        }
+
+                        //if (!lines[i].product.taxes)
+                        //    continue;
+
+                        //Update TAXES
+
+                        for (var j = 0; j < lines[i].total_taxes.length; j++) {
+                            //}
+
+                            let idTax = _.find(total_taxes, _.matchesProperty("taxeId", lines[i].total_taxes[j].taxeId._id.toString()));
+
+                            //lines[i].total_taxes[idTaxe] = {
+                            //    taxeId: lines[i].product.taxes[j].taxeId._id
+                            //}; //Create new taxe
+
+                            lines[i].total_taxes[j].value = 0;
+                            //console.log("test", lines[i].total_taxes, total_taxes, idTax);
+
+                            if (idTax.isFixValue == true) { //ecotax // find ecotax in product
+                                //console.log(_.matchesProperty('taxeId', lines[i].total_taxes[j].taxeId._id.toString()));
+                                lines[i].total_taxes[j].value = lines[i].qty * _.find(lines[i].product.taxes, _.matchesProperty('taxeId', lines[i].total_taxes[j].taxeId._id.toString())).value;
+                            } else
+                                lines[i].total_taxes[j].value = lines[i].total_ht * lines[i].total_taxes[j].taxeId.rate / 100;
+
+                            idTax.total += lines[i].total_taxes[j].value;
+                        }
+                    }
+                    cb(null, VATIsUsed);
+
+                });
+            },
+            function(VATIsUsed, cb) {
+                //return console.log(lines[5]);
+
+                // shipping cost
+                if (!shipping.total_ht)
+                    return cb(null, VATIsUsed);
+
+                total_ht += shipping.total_ht;
+
+                if (!VATIsUsed)
+                    return cb(null, VATIsUsed);
+
+                TaxesModel.findOne({
+                    isDefault: true
+                }, function(err, taxe) {
+                    if (err)
+                        return cb(err);
+
+                    if (taxe == null)
+                        return cb("No default taxe");
+
+                    shipping.total_taxes = [];
+                    shipping.total_taxes.push({
+                        taxeId: taxe._id,
+                        value: shipping.total_ht * taxe.rate / 100
+                    });
+
+                    //Add VAT
+
+                    let idTax = _.find(total_taxes, _.matchesProperty("taxeId", taxe._id.toString()));
+                    if (idTax)
+                        idTax.total += shipping.total_ht * taxe.rate / 100;
+                    else
+                        total_taxes.push({
+                            sequence: taxe.sequence,
+                            taxeId: taxe._id,
+                            isFixValue: taxe.isFixValue,
+                            total: shipping.total_ht * taxe.rate / 100
+                        });
+
+                    cb(null, VATIsUsed);
+
+                });
+            },
+            function(VATIsUsed, cb) {
+                // EcoTax
+
+                //return console.log(total_taxes);
+
+                var ecotax = {
+                    value: 0, //ecotax Value
+                    total_tax: 0, // Add 20% on ecotax
+                    taxeId: null // Id tax 20% VAT
+                };
+
+                async.each(total_taxes, function(tax, eCb) {
+                    if (tax.isFixValue == false) //classic VAT
+                        return eCb();
+
+                    ecotax.value = tax.total; // Add ecoTax in Total HT ADD NEXT FOR SUBTOTAL
+
+                    if (!VATIsUsed)
+                        return eCb();
+
+                    TaxesModel.findOne({
+                        isDefault: true
+                    }, function(err, taxe) {
+                        if (err)
+                            return eCb(err);
+
+                        if (taxe == null)
+                            return eCb("No default taxe");
+
+                        ecotax.taxeId = taxe._id;
+                        ecotax.total_tax = tax.total * taxe.rate / 100;
+
+                        eCb();
+                    });
+                }, function(err) {
+                    return cb(err, VATIsUsed, ecotax);
+                });
+            }
+        ],
+        function(err, VATIsUsed, ecotax) {
+
+            if (err)
+                return callback(err);
+
+
+            var i, j, k, length, found;
+            var subtotal = 0;
+
+            for (i = 0, length = lines.length; i < length; i++) {
+                // SUBTOTAL
+                if (lines[i].type == 'SUBTOTAL') {
+                    lines[i].total_ht = subtotal;
+                    subtotal = 0;
+                    continue;
+                }
+                if (lines[i].type == 'COMMENT') {
+                    lines[i].total_ht = 0;
+                    continue;
+                }
+                if (lines[i].isDeleted || !lines[i].qty)
+                    continue;
+
+                total_ht += lines[i].total_ht;
+                subtotal += lines[i].total_ht;
+
+                //Add ecotax
+                /*let ecotax = _.sum(_.filter(lines[i].total_taxes, function(tax) {
+                    return total_taxes[taxesId[tax.taxeId.toString()]].isFixValue; // Get Only EcoTax isFixValue 
+                }), 'value');
+
+                if (ecotax)
+                    subtotal += ecotax;*/
+
+                //this.total_ttc += this.lines[i].total_ttc;
+
+                if (lines[i].product && lines[i].product._id)
+                    //Poids total
+                    weight += (lines[i].product.weight || 0) * lines[i].qty;
+
+                count += lines[i].qty;
+            }
+
+            if (discount && discount.discount && discount.discount.percent >= 0) {
+                discount.discount.value = exports.round(total_ht * discount.discount.percent / 100, 2);
+                total_ht -= discount.discount.value;
+
+                if (VATIsUsed)
+                    // Remise sur les TVA
+                    for (j = 0; j < total_taxes.length; j++) {
+                        if (total_taxes[j].isFixValue)
+                            continue;
+
+                        total_taxes[j].total -= total_taxes[j].total * discount.discount.percent / 100;
+                    }
+            }
+
+            if (discount && discount.escompte && discount.escompte.percent >= 0) {
+                discount.escompte.value = exports.round(total_ht * discount.escompte.percent / 100, 2);
+                total_ht -= discount.escompte.value;
+
+                if (VATIsUsed)
+                    // Remise sur les TVA
+                    for (j = 0; j < total_taxes.length; j++) {
+                        if (total_taxes[j].isFixValue)
+                            continue;
+
+                        total_taxes[j].total -= total_taxes[j].total * discount.escompte.percent / 100;
+                    }
+            }
+
+            //Add ecotax to total_ht after ALL DISCOUNT
+            total_ht += ecotax.value;
+
+            if (VATIsUsed && ecotax && ecotax.value) {
+                //Add ECOTAX in VTA
+
+                let idTax = _.find(total_taxes, _.matchesProperty("taxeId", ecotax.taxeId.toString()));
+                if (idTax)
+                    idTax.total += ecotax.total_tax;
+                else
+                    total_taxes.push({
+                        taxeId: ecotax.taxeId,
+                        isFixValue: true,
+                        value: ecotax.total_tax
+                    });
+            }
+
+
+            total_ht = exports.round(total_ht, 2);
+            total_ttc = total_ht;
+
+            if (VATIsUsed)
+                for (j = 0; j < total_taxes.length; j++) {
+                    total_taxes[j].value = exports.round(total_taxes[j].total, 2);
+                    if (total_taxes[j].isFixValue)
+                        continue;
+
+                    total_ttc += total_taxes[j].value;
+                }
+
+            total_taxes = _.sortBy(total_taxes, 'sequence');
+
+            callback(null, {
+                total_ht: round(total_ht, 2),
+                total_taxes: total_taxes,
+                total_ttc: round(total_ttc, 2),
+                weight: weight,
+                count: count
+            });
+        });
+};
+
+exports.checksumIsbn = function(isbn) {
+    // ISBN 13
+    isbn = isbn.replace(/[^\dX]/gi, '');
+    //console.log(isbn.length);
+    if (isbn.length != 12)
+        return null;
+
+    var chars = isbn.split('');
+    //if (chars[9].toUpperCase() == 'X')
+    //    chars[9] = 10;
+
+    var sum = 0;
+    for (var i = 0; i < chars.length; i++)
+        sum += parseInt(chars[i]) * (i % 2 == 0 ? 3 : 1);
+
+    return sum % 10;
 };

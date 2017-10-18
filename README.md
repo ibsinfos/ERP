@@ -4,7 +4,9 @@
 
 # Framework base to build your ToManage open source ERP software with objects connected network (IoT)
 
-ToManage is the first open source ERP software with objects connected network (IoT : Internet of Things).
+![Build status](https://img.shields.io/travis/ToManage/TM-CRM_ERP/develop.svg)
+
+ToManage is the first ERP software with internet of things (IOT) network in open source.
 
 open source ERP software ToManage manage your organization's activity (contacts, suppliers, invoices, orders, stocks, agenda, ecommerce, planning, etc ...).
 Objects connected network (IOT) integrating in open source ERP software ToManage allow for faster and further (to collect relevant external data, to relay sensor data through, to create alerts, ...) to work in real time .
@@ -35,17 +37,20 @@ You can use it as a standalone application or as a web application to be able to
 ## Install the open source ERP software ToManage
 
 Need :
- - install Node.js > 4.0
- - install MongoDB > 3.2
+ - install Node.js 4.x
+ - install MongoDB 3.2
+
+```shell
+curl -sL https://deb.nodesource.com/setup_4.x | sudo bash -
+apt-get install nodejs
+```
 
 ```shell
 git clone git@github.com:ToManage/framework.git
 ```
 
 ```shell
-npm install -g bower
 npm install
-bower install
 ```
 
 Using demo mongoDB database from dump directory
@@ -62,6 +67,46 @@ Edit and replace demo name database in config file
 
 ```shell
 node debug.js
+```
+
+## Run node.js service with systemd
+
+Create /etc/systemd/system/nodeserver.service
+
+```shell
+[Unit]
+Description=ToManage ERP
+Documentation=https://www.tomanage.fr
+After=network.target
+Requires=mongodb.service
+
+[Service]
+Environment=NODE_PORT=8000
+Type=simple
+User=root
+Group=root
+# Output to syslog
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=nodeserver
+ExecStart=/usr/bin/node /path/to/tomanage/debug.js
+WorkingDirectory=/path/to/tomanage
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+Enable the service
+
+```shell
+systemctl enable nodeserver.service
+Created symlink from /etc/systemd/system/multi-user.target.wants/nodeserver.service to /etc/systemd/system/nodeserver.service.
+```
+Start the service
+
+```shell
+systemctl start nodeserver.service
 ```
 
 Demo authentication : admin/admin
